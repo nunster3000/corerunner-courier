@@ -1,6 +1,6 @@
 # CoreRunner Courier Project Blueprint
 
-CoreRunner Courier is a fictional Atlanta courier service being developed as a portfolio web application, with a structure that could support a future sale to a courier operator. This blueprint records the product decisions agreed during planning and defines the first implementation scope. A local React and Express implementation now supports persisted demo accounts, backend quotes and bookings, dispatch and courier workspaces, status tracking, signature/PIN/photo proof, sender authorization, and simulated payment events in SQLite. Corey now has an optional server-side OpenAI Responses integration with conversational draft collection, verified-account quotes, customer-confirmed chat booking, and scoped status lookup. A local API key is required; grocery image analysis and support case submission remain planned. The implementation is a local demo, with the limits documented in README.md.
+CoreRunner Courier is a fictional Atlanta courier service being developed as a portfolio web application, with a structure that could support a future sale to a courier operator. This blueprint records the product decisions agreed during planning and defines the first implementation scope. A local React and Express implementation now supports persisted demo accounts, backend quotes and bookings, dispatch and courier workspaces, status tracking, signature/PIN/photo proof, sender authorization, and simulated payment events in SQLite. Corey defaults to a local scripted assistant with guided registration, backend quotes, customer-confirmed chat booking, and scoped status lookup. No real AI or API key is used in this portfolio. An optional AI adapter is retained for a future owner; grocery image analysis and support case submission remain planned. The implementation is a local demo, with the limits documented in README.md.
 
 The product centers on personal and small-business deliveries. A polished React.js customer experience connects to a backend that owns bookings, prices, dispatch, tracking, permissions, and payment records. Corey the Courier is the AI booking and customer service agent, not the company name.
 
@@ -205,7 +205,7 @@ Backend requirements include role-based access, valid transition checks, duplica
 | Payments | Clearly labeled simulator; no real cards or money movement |
 | Email and verification | Demo inbox with backend-generated links; not proof of real mailbox ownership |
 | Tracking | Clearly labeled simulated trips plus a real phone-location test path |
-| Corey | OpenAI Responses integration; configurable model defaults to gpt-5-mini. Missing-key state is explicit; no scripted fallback |
+| Corey | Scripted local demo by default. Optional AI adapter is disabled and reserved for a future owner’s configuration. |
 | Grocery evidence | Screenshot extraction and review; no claim of direct store verification |
 
 A future commercial deployment must replace simulated verification, payment, and notification integrations and validate background tracking on supported devices. Configurable branding and operational rules should aid resale. Selling a single-operator application versus licensing to multiple isolated companies remains an open business decision; multi-company SaaS is not part of the current commitment.

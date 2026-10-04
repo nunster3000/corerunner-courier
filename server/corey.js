@@ -1,3 +1,4 @@
+import { demoReply } from "./corey-demo.js";
 import { randomBytes } from "node:crypto";
 import { Problem, fail, atlantaDate } from "./domain.js";
 
@@ -113,7 +114,7 @@ export function openAIProvider({
 
 export function installCorey(
   app,
-  { provider, getUser, createQuote, listBookings },
+  { provider, mock = false, getUser, createQuote, listBookings },
 ) {
   const sessions = new Map();
   let requestTimes = [];
@@ -156,8 +157,8 @@ export function installCorey(
   };
   app.get("/api/corey/status", (req, res) =>
     res.json({
-      available: !!provider,
-      mode: provider ? "live-ai" : "not-configured",
+      available: mock || !!provider,
+      mode: mock ? "mock" : provider ? "live-ai" : "not-configured",
     }),
   );
   app.post("/api/corey/reset", (req, res) => {
@@ -167,10 +168,11 @@ export function installCorey(
     s.draft = { unattended: false };
     s.quote = null;
     s.turns = 0;
+    s.pending = null;
     res.json({ ok: true });
   });
   app.post("/api/corey/message", async (req, res) => {
-    if (!provider)
+    if (!provider && !mock)
       fail(
         503,
         "Corey’s AI is not configured yet. Add the server API key or use the booking form.",
@@ -198,6 +200,10 @@ export function installCorey(
           req.body.draft[key].length <= 300
         )
           draft[key] = req.body.draft[key];
+    }
+    if (mock) {
+      s.draft = draft;
+      return res.json(demoReply(s, message, user, createQuote, listBookings));
     }
     if (JSON.stringify(s.history).length > 80000)
       fail(

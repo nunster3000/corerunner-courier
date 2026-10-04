@@ -595,7 +595,7 @@ const aiCall = (name, args = {}) => [
   },
 ];
 test("Corey is explicitly unavailable without a provider", async (t) => {
-  const { client } = await fixture(t, { aiProvider: null });
+  const { client } = await fixture(t, { aiProvider: null, coreyMode: "live" });
   const c = client();
   assert.equal((await c("/corey/status")).body.available, false);
   assert.equal((await c("/corey/message", { message: "Hello" })).status, 503);
@@ -711,4 +711,28 @@ test("Corey rolls back failed model turns and rejects oversized messages", async
   const r = await c("/corey/message", { message: "Hello" });
   assert.equal(r.status, 200);
   assert.equal(r.body.draft.name, undefined);
+});
+
+test("Corey defaults to a local scripted guide even with an API key present", async (t) => {
+  const before = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key-must-not-be-used";
+  try {
+    const { client } = await fixture(t);
+    const c = client();
+    assert.deepEqual((await c("/corey/status")).body, {
+      available: true,
+      mode: "mock",
+    });
+    const start = await c("/corey/message", { message: "start" });
+    assert.equal(start.status, 200);
+    assert.match(start.body.reply, /full name/);
+    const name = await c("/corey/message", { message: "Alex Mock" });
+    assert.equal(name.body.draft.name, "Alex Mock");
+    assert.match(name.body.reply, /email/);
+    const invalid = await c("/corey/message", { message: "invalid-email" });
+    assert.match(invalid.body.reply, /valid email/);
+  } finally {
+    if (before === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = before;
+  }
 });

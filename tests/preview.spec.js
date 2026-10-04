@@ -77,15 +77,15 @@ test("groceries remain pending and unattended delivery is explicit", async ({
     page.getByText("Unattended authorized · photo required"),
   ).toBeVisible();
 });
-test("Corey without a key offers the manual booking path", async ({ page }) => {
+test("Corey runs as a scripted demo without a key", async ({ page }) => {
   await page.goto("/");
   await page
     .getByRole("button", { name: "Book with Corey", exact: true })
     .click();
   await expect(
-    page.getByText("Corey needs a server API key", { exact: false }),
+    page.getByText("Scripted portfolio demo", { exact: false }),
   ).toBeVisible();
-  await expect(page.getByLabel("Reply to Corey")).toBeDisabled();
+  await expect(page.getByLabel("Reply to Corey")).toBeEnabled();
   await page
     .getByRole("button", { name: "Prefer a form? Continue there" })
     .click();

@@ -125,3 +125,48 @@ test("AI failure preserves typed input and lets the customer continue in the for
     .click();
   await expect(page.getByLabel("Full name", { exact: true })).toBeVisible();
 });
+
+test("scripted Corey completes booking with no AI transport or API key", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Book with Corey", exact: true })
+    .click();
+  await expect(
+    page.getByText("Scripted portfolio demo", { exact: false }),
+  ).toBeVisible();
+  for (const answer of [
+    "start",
+    "Alex Mock",
+    `mock-${crypto.randomUUID()}@example.com`,
+    "4045550123",
+    "100 Sample Street, Atlanta 30303",
+    "200 Example Lane, Decatur 30030",
+    "Jamie Mock",
+    "jamie@example.com",
+    "8",
+  ]) {
+    await page.getByLabel("Reply to Corey").fill(answer);
+    await page.getByRole("button", { name: "Send reply" }).click();
+    await expect(page.getByLabel("Reply to Corey")).toHaveValue("");
+    await expect(page.getByLabel("Reply to Corey")).toBeEnabled();
+  }
+  await page
+    .getByRole("button", { name: "Verify account", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Simulate email verification" })
+    .click();
+  await page.getByLabel("Reply to Corey").fill("quote");
+  await page.getByRole("button", { name: "Send reply" }).click();
+  await page
+    .getByRole("checkbox", {
+      name: "I accept this demo quote and the return policy.",
+    })
+    .check();
+  await page.getByRole("button", { name: "Confirm demo booking" }).click();
+  await expect(
+    page.getByText("Booking saved ·", { exact: false }),
+  ).toBeVisible();
+});

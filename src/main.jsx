@@ -1329,8 +1329,8 @@ function App() {
                     </div>
                     <p className="prototype-note">
                       Bookings persist on the backend. Email, payments, routes,
-                      and tracking are simulated. Corey uses AI when configured.
-                      Please use sample details.
+                      and tracking are simulated. Corey is a scripted demo
+                      assistant. Please use sample details.
                     </p>
                   </aside>
                 </div>

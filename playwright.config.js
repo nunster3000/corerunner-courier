@@ -16,6 +16,7 @@ export default defineConfig({
     command: "npm run dev -- --port 5175 --strictPort",
     env: {
       OPENAI_API_KEY: "",
+      COREY_MODE: "mock",
       API_PORT: "3005",
       DB_PATH: ":memory:",
       TEST_PREVIEW: "1",

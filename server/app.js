@@ -1,4 +1,4 @@
-import { installCorey, openAIProvider } from "./corey.js";
+import { installCorey } from "./corey.js";
 import express from "express";
 import { randomBytes, randomUUID, createHash, randomInt } from "node:crypto";
 import { openDatabase, transaction } from "./db.js";
@@ -38,7 +38,8 @@ const cookie = (res, name, value, maxAge) =>
 export function createApp({
   dbPath = "data/corerunner.sqlite",
   demo = true,
-  aiProvider = openAIProvider(),
+  aiProvider = null,
+  coreyMode = "mock",
 } = {}) {
   const app = express(),
     db = openDatabase(dbPath);
@@ -296,6 +297,7 @@ export function createApp({
   };
   installCorey(app, {
     provider: aiProvider,
+    mock: coreyMode === "mock" && !aiProvider,
     getUser: (req) =>
       db
         .prepare(

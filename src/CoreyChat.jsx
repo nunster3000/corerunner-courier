@@ -11,6 +11,7 @@ export default function CoreyChat({
   user,
   onUser,
 }) {
+  const [mode, setMode] = useState("mock");
   const [available, setAvailable] = useState(null),
     [messages, setMessages] = useState([]),
     [input, setInput] = useState(""),
@@ -29,7 +30,10 @@ export default function CoreyChat({
     if (open) {
       close.current?.focus();
       api("/corey/status")
-        .then((r) => setAvailable(r.available))
+        .then((r) => {
+          setAvailable(r.available);
+          setMode(r.mode || "live-ai");
+        })
         .catch((e) => setError(e.message));
     }
   }, [open]);
@@ -143,7 +147,11 @@ export default function CoreyChat({
         <div>
           <strong>Corey the Courier</strong>
           <small>
-            {available ? "AI booking & support" : "AI connection setup"}
+            {mode === "mock"
+              ? "Scripted demo assistant"
+              : available
+                ? "AI booking & support"
+                : "AI connection setup"}
           </small>
         </div>
         <button
@@ -157,13 +165,15 @@ export default function CoreyChat({
       </div>
       <div className="chat-content" aria-live="polite" aria-busy={busy}>
         <p className="chat-disclaimer">
-          {available
-            ? "AI conversations are sent to OpenAI. Use sample details in this portfolio demo. Email, payments and delivery operations are simulated."
-            : "Corey needs a server API key before AI chat is available. You can still book using the form."}
+          {mode === "mock"
+            ? "Scripted portfolio demo · no AI service or API key is used. Say start to book or help for service questions. Use sample details."
+            : available
+              ? "AI conversations are sent to OpenAI. Use sample details in this portfolio demo. Email, payments and delivery operations are simulated."
+              : "Corey needs a server API key before AI chat is available. You can still book using the form."}
         </p>
         <div className="bubble">
-          Hey, I’m Corey! Tell me what you’re sending and where it needs to go.
-          I can help with delivery questions, your account, and booking right
+          Hey, I’m Corey! Say “start” and I’ll guide you through a delivery. I
+          can help with delivery questions, your account, and booking right
           here.
         </div>
         {messages.map((m, i) => (

@@ -1,3 +1,4 @@
+import { openAIProvider } from "./corey.js";
 import { createApp } from "./app.js";
 try {
   process.loadEnvFile(".env");
@@ -11,6 +12,8 @@ if (process.env.NODE_ENV === "production")
 const { app, db } = createApp({
   dbPath: process.env.DB_PATH || "data/corerunner.sqlite",
   demo: true,
+  coreyMode: process.env.COREY_MODE === "live" ? "live" : "mock",
+  aiProvider: process.env.COREY_MODE === "live" ? openAIProvider() : null,
 });
 const server = app.listen(
   Number(process.env.API_PORT || 3001),
