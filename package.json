@@ -1,0 +1,30 @@
+{
+  "name": "corerunner-courier",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "playwright test",
+    "format": "prettier --write src server scripts tests *.js *.json index.html .vscode",
+    "api": "node --watch server/index.js",
+    "test:server": "node --test server/*.test.js",
+    "pretest": "npm run build"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "prettier": "^3.9.9",
+    "vite": "^8.3.2"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}
