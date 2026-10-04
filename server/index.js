@@ -1,4 +1,9 @@
 import { createApp } from "./app.js";
+try {
+  process.loadEnvFile(".env");
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
+}
 if (process.env.NODE_ENV === "production")
   throw new Error(
     "Local demo only: replace demo identity and staff access before production deployment.",

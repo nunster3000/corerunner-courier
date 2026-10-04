@@ -1,3 +1,4 @@
+import { installCorey, openAIProvider } from "./corey.js";
 import express from "express";
 import { randomBytes, randomUUID, createHash, randomInt } from "node:crypto";
 import { openDatabase, transaction } from "./db.js";
@@ -37,6 +38,7 @@ const cookie = (res, name, value, maxAge) =>
 export function createApp({
   dbPath = "data/corerunner.sqlite",
   demo = true,
+  aiProvider = openAIProvider(),
 } = {}) {
   const app = express(),
     db = openDatabase(dbPath);
@@ -276,8 +278,8 @@ export function createApp({
     res.clearCookie("cr_session", { path: "/api" });
     res.json({ ok: true });
   });
-  app.post("/api/quotes", auth, (req, res) => {
-    const d = delivery(req.body),
+  const createQuote = (userId, input) => {
+    const d = delivery(input),
       q = {
         id: randomUUID(),
         delivery: d,
@@ -286,12 +288,40 @@ export function createApp({
       };
     db.prepare("INSERT INTO quotes VALUES(?,?,?,?)").run(
       q.id,
-      req.user.id,
+      userId,
       JSON.stringify(q),
       q.expires,
     );
-    res.status(201).json(q);
+    return q;
+  };
+  installCorey(app, {
+    provider: aiProvider,
+    getUser: (req) =>
+      db
+        .prepare(
+          "SELECT u.id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?",
+        )
+        .get(hash(cookies(req).cr_session), Date.now()),
+    createQuote,
+    listBookings: (userId) =>
+      db
+        .prepare(
+          "SELECT id,payload FROM bookings WHERE user_id=? ORDER BY rowid DESC LIMIT 10",
+        )
+        .all(userId)
+        .map((r) => {
+          const b = JSON.parse(r.payload);
+          return {
+            id: r.id,
+            status: b.status,
+            service: b.delivery.service,
+            created: b.created,
+          };
+        }),
   });
+  app.post("/api/quotes", auth, (req, res) =>
+    res.status(201).json(createQuote(req.user.id, req.body)),
+  );
   app.post("/api/bookings", auth, (req, res) => {
     const key = text(req.get("Idempotency-Key"), "Idempotency key", 100);
     const result = transaction(db, () => {

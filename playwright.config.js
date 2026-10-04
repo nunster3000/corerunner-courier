@@ -14,7 +14,12 @@ export default defineConfig({
   },
   webServer: {
     command: "npm run dev -- --port 5175 --strictPort",
-    env: { API_PORT: "3005", DB_PATH: ":memory:", TEST_PREVIEW: "1" },
+    env: {
+      OPENAI_API_KEY: "",
+      API_PORT: "3005",
+      DB_PATH: ":memory:",
+      TEST_PREVIEW: "1",
+    },
     url: "http://127.0.0.1:5175",
     reuseExistingServer: false,
   },

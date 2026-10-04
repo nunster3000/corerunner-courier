@@ -57,7 +57,17 @@ There is no generic completion bypass in dispatch. Delivered and returned status
 
 This application binds to loopback and refuses a production start. Demo authentication can impersonate any sample email, so **use sample data and do not expose this server publicly**. This is intentional for a local portfolio walkthrough; it is not an authentication system suitable for a deployed service. Public deployment requires a real email provider, stronger staff identity, token delivery, operational authorization, abuse controls, and a production hosting configuration.
 
-Corey remains a scripted assistant. He collects information and transfers it to the booking form; no AI model is connected and he does not yet complete the entire booking inside chat.
+## Real AI setup
+
+Corey now uses OpenAI’s Responses API through the Express backend. Copy `.env.example` to `.env`, add `OPENAI_API_KEY` locally, then restart `npm run dev`. `OPENAI_MODEL` defaults to `gpt-5-mini` and can be changed to a compatible Responses model supporting function calls and low reasoning effort. The key stays on the server; never use a `VITE_` prefix. `.env` is ignored by Git. Without a key, chat clearly reports that it is unavailable and offers the manual form. There is no silent scripted fallback.
+
+Corey gathers account and delivery details, answers policy questions, prepares backend quotes, and reads the signed-in customer’s recent statuses. Account verification and quote confirmation are explicit controls inside chat. The confirmation calls the same transactional booking API as the form. Unattended delivery is a customer checkbox, never an AI tool. Email verification, payments, route estimates, and dispatch remain local simulations even when the AI connection is real. Grocery image analysis, actual support-case submission, cancellation and refund tools are not implemented.
+
+Messages and the delivery details supplied in chat go to OpenAI; use fictional sample details. Requests use `store: false` (this is not a claim of zero provider retention). Conversations are held in server memory for up to one hour, scoped by an HttpOnly cookie, and reset on an authenticated account change or server restart. The UI transcript is not restored on page refresh. Limits: 2,000 characters per message, 40 turns per conversation, four model calls per turn, 2,400 output tokens per call, 30-second request timeouts, 80 KB of accumulated context, and 20 turns per minute across this local server. An API key can incur usage charges; set a project budget in your provider account before an extended demo.
+
+Tests inject deterministic model outputs or mock only the browser AI transport; they do not spend API credits. They verify tool boundaries, quote validation, isolation, explicit consent and booking persistence. A live API smoke test requires a configured key and is separate from these checks.
+
+References: [Responses function calling](https://developers.openai.com/api/docs/guides/function-calling) and [GPT-5 mini](https://developers.openai.com/api/docs/models/gpt-5-mini).
 
 ## Illustrative pricing and dispatch behavior
 
@@ -79,7 +89,9 @@ The implemented return branch models recipient unavailability only. Other failur
 
 ## Source layout
 
-- `src/main.jsx`: homepage, guided booking, and Corey preview.
+- `src/main.jsx`: homepage and guided booking.
+- `src/CoreyChat.jsx`: conversational registration, quote review and booking.
+- `server/corey.js`: server-only Responses adapter, session limits and validated tool execution.
 - `src/DeliveryHub.jsx`: customer history, dispatch board, recipient tracking.
 - `src/CourierWorkspace.jsx`: assigned jobs, handoff capture, failed attempts and returns.
 - `src/ProofCapture.jsx`: PIN, signature, photo input and authenticated proof history.

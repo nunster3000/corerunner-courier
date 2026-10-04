@@ -77,36 +77,19 @@ test("groceries remain pending and unattended delivery is explicit", async ({
     page.getByText("Unattended authorized · photo required"),
   ).toBeVisible();
 });
-test("Corey carries conversational details into manual registration", async ({
-  page,
-}) => {
+test("Corey without a key offers the manual booking path", async ({ page }) => {
   await page.goto("/");
   await page
     .getByRole("button", { name: "Book with Corey", exact: true })
     .click();
-  for (const answer of [
-    "Alex Sample",
-    "alex@example.com",
-    "4045550123",
-    "100 Sample St, Atlanta 30303",
-    "200 Example St, Decatur 30030",
-    "Jamie",
-    "jamie@example.com",
-  ]) {
-    await page.getByLabel("Reply to Corey").fill(answer);
-    await page.getByRole("button", { name: "Send reply" }).click();
-  }
-  await page.getByRole("button", { name: "Review delivery details" }).click();
-  await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
-    "Alex Sample",
-  );
-  await expect(page.getByLabel("Default pickup address")).toHaveValue(
-    "100 Sample St, Atlanta 30303",
-  );
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText(
-    /verify your preview account/,
-  );
+  await expect(
+    page.getByText("Corey needs a server API key", { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Reply to Corey")).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Prefer a form? Continue there" })
+    .click();
+  await expect(page.getByLabel("Full name", { exact: true })).toBeVisible();
 });
 test("homepage and mobile booking render without overflow or runtime errors", async ({
   page,

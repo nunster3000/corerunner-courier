@@ -2604,3 +2604,40 @@ section[id] {
     overflow-wrap: anywhere;
   }
 }
+
+.corey-ai-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #d4a62a;
+  color: #142348;
+}
+.corey-card {
+  padding: 16px;
+  margin: 12px 0;
+  border: 1px solid #d4a62a;
+  border-radius: 14px;
+  background: #fffdf5;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.corey-card label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0;
+}
+.corey-card input {
+  flex: 0 0 auto;
+  margin-top: 4px;
+}
+.corey-card .button {
+  width: 100%;
+  margin-top: 8px;
+}
+.chat-content .bubble {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

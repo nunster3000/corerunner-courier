@@ -578,3 +578,137 @@ test("return beginning closes authorization and signed return charges only once"
     200,
   );
 });
+
+const aiText = (text) => [
+  {
+    type: "message",
+    role: "assistant",
+    content: [{ type: "output_text", text }],
+  },
+];
+const aiCall = (name, args = {}) => [
+  {
+    type: "function_call",
+    call_id: randomUUID(),
+    name,
+    arguments: JSON.stringify(args),
+  },
+];
+test("Corey is explicitly unavailable without a provider", async (t) => {
+  const { client } = await fixture(t, { aiProvider: null });
+  const c = client();
+  assert.equal((await c("/corey/status")).body.available, false);
+  assert.equal((await c("/corey/message", { message: "Hello" })).status, 503);
+});
+test("Corey prepares an authoritative quote but cannot book or grant unattended consent", async (t) => {
+  let count = 0;
+  const provider = async (input) => {
+    count++;
+    if (count === 1)
+      return aiCall(
+        "update_delivery_draft",
+        Object.fromEntries(
+          Object.entries(sample)
+            .filter(([k]) => k !== "unattended")
+            .map(([k, v]) => [k, String(v)]),
+        ),
+      );
+    if (count === 2) return aiCall("prepare_quote");
+    if (count === 3)
+      return aiCall("book_delivery", {
+        accepted: true,
+        unattended: true,
+        total: 1,
+      });
+    assert.match(input.at(-1).output, /Unsupported tool/);
+    return aiText("Review and confirm your quote.");
+  };
+  const { client, db } = await fixture(t, { aiProvider: provider });
+  const c = client();
+  await login(c);
+  const r = await c("/corey/message", { message: "Please book my package" });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.quote.delivery.unattended, false);
+  assert.ok(r.body.quote.price.total > 1);
+  assert.equal(db.prepare("SELECT count(*) n FROM bookings").get().n, 0);
+  const booked = await c(
+    "/bookings",
+    { quoteId: r.body.quote.id, accepted: true },
+    { "Idempotency-Key": randomUUID() },
+  );
+  assert.equal(booked.status, 201);
+});
+test("Corey cannot quote before verification or bypass delivery validation", async (t) => {
+  let last;
+  const provider = async (input) => {
+    if (input.at(-1).role === "user") return aiCall("prepare_quote");
+    last = JSON.parse(input.at(-1).output);
+    return aiText("Please check your details.");
+  };
+  const { client, db } = await fixture(t, { aiProvider: provider });
+  const c = client();
+  await c("/corey/message", {
+    message: "Quote this",
+    draft: { ...sample, weight: "51" },
+  });
+  assert.match(last.error, /verify their account/);
+  await login(c);
+  await c("/corey/message", { message: "Quote now" });
+  assert.match(last.error, /at most 50/);
+  assert.equal(db.prepare("SELECT count(*) n FROM quotes").get().n, 0);
+});
+test("Corey history is browser-bound and statuses are scoped to the verified account", async (t) => {
+  const histories = [];
+  let result;
+  const provider = async (input) => {
+    histories.push(JSON.stringify(input));
+    if (input.at(-1).role === "user") return aiCall("list_my_deliveries");
+    result = JSON.parse(input.at(-1).output);
+    return aiText("Here is your status.");
+  };
+  const { client } = await fixture(t, { aiProvider: provider });
+  const a = client(),
+    b = client();
+  await login(a);
+  const booked = await book(a);
+  await a("/corey/message", { message: "Private conversation marker" });
+  assert.equal(result.deliveries.length, 1);
+  assert.equal(result.deliveries[0].id, booked.id);
+  await login(b, "other@example.com");
+  histories.length = 0;
+  await b("/corey/message", { message: "My deliveries" });
+  assert.equal(result.deliveries.length, 0);
+  assert.ok(histories.every((h) => !h.includes("Private conversation marker")));
+  await a("/logout", {});
+  histories.length = 0;
+  await a("/corey/message", { message: "My deliveries again" });
+  assert.match(result.error, /Verify your account/);
+  assert.ok(histories.every((h) => !h.includes("Private conversation marker")));
+});
+test("Corey rolls back failed model turns and rejects oversized messages", async (t) => {
+  let count = 0,
+    failTurn = true;
+  const provider = async (input) => {
+    if (!failTurn) {
+      assert.ok(!JSON.stringify(input).includes("Uncommitted Name"));
+      return aiText("Hello");
+    }
+    if (count++ === 0)
+      return aiCall("update_delivery_draft", { name: "Uncommitted Name" });
+    throw new Error("Test provider unavailable");
+  };
+  const { client } = await fixture(t, { aiProvider: provider });
+  const c = client();
+  assert.equal(
+    (await c("/corey/message", { message: "x".repeat(2001) })).status,
+    400,
+  );
+  assert.equal(
+    (await c("/corey/message", { message: "Save name" })).status,
+    503,
+  );
+  failTurn = false;
+  const r = await c("/corey/message", { message: "Hello" });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.draft.name, undefined);
+});

@@ -1,3 +1,4 @@
+import CoreyChat from "./CoreyChat.jsx";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -225,9 +226,6 @@ function App() {
     [step, setStep] = useState(0),
     [data, setData] = useState(empty),
     [chat, setChat] = useState(false),
-    [chatIndex, setChatIndex] = useState(0),
-    [chatInput, setChatInput] = useState(""),
-    [messages, setMessages] = useState([]),
     [error, setError] = useState(""),
     [verified, setVerified] = useState(false),
     [inbox, setInbox] = useState(false),
@@ -242,9 +240,7 @@ function App() {
     [accepted, setAccepted] = useState(false),
     [paymentOutcome, setPaymentOutcome] = useState("approve");
   const bookingKey = useRef(crypto.randomUUID());
-  const chatEnd = useRef(null),
-    closeChat = useRef(null),
-    lastFocus = useRef(null),
+  const lastFocus = useRef(null),
     inboxRef = useRef(null);
   const update = (key, value) => {
     setData((d) => ({ ...d, [key]: value }));
@@ -379,39 +375,11 @@ function App() {
       setError(e.message);
     }
   }
-  const chatFields = [
-    ["name", "First, what’s your full name?"],
-    ["email", "What email should we use for your account and updates?"],
-    ["phone", "And your phone number?"],
-    [
-      "pickup",
-      "Where should we pick up your package? Include the city and ZIP code.",
-    ],
-    ["dropoff", "Where is it going? Include the city and ZIP code."],
-    ["recipient", "Who will receive it?"],
-    ["recipientEmail", "What’s the recipient’s email for tracking updates?"],
-  ];
   const openChat = () => {
     lastFocus.current = document.activeElement;
     setChat(true);
     setError("");
   };
-  useEffect(() => {
-    if (chat) {
-      closeChat.current?.focus();
-      const fn = (e) => {
-        if (e.key === "Escape") {
-          setChat(false);
-          lastFocus.current?.focus();
-        }
-      };
-      document.addEventListener("keydown", fn);
-      return () => document.removeEventListener("keydown", fn);
-    }
-  }, [chat]);
-  useEffect(() => {
-    chatEnd.current?.scrollIntoView({ block: "nearest" });
-  }, [messages, chatIndex]);
   useEffect(() => {
     if (!inbox) return;
     const previous = document.activeElement;
@@ -440,31 +408,6 @@ function App() {
       previous?.focus();
     };
   }, [inbox]);
-  const reply = (e) => {
-    e.preventDefault();
-    const value = chatInput.trim();
-    if (!value) return;
-    const [key] = chatFields[chatIndex];
-    if (
-      key.toLowerCase().includes("email") &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-    ) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-    if (key === "phone" && value.replace(/\D/g, "").length < 10) {
-      setError("Please include a phone number with at least 10 digits.");
-      return;
-    }
-    update(key, value);
-    setMessages((m) => [
-      ...m,
-      { question: chatFields[chatIndex][1], answer: value },
-    ]);
-    setChatInput("");
-    setChatIndex((i) => i + 1);
-    setError("");
-  };
   const next = async (e) => {
     e.preventDefault();
     setError("");
@@ -1386,8 +1329,8 @@ function App() {
                     </div>
                     <p className="prototype-note">
                       Bookings persist on the backend. Email, payments, routes,
-                      and Corey’s conversation are simulated. Please use sample
-                      details.
+                      and tracking are simulated. Corey uses AI when configured.
+                      Please use sample details.
                     </p>
                   </aside>
                 </div>
@@ -1440,101 +1383,28 @@ function App() {
           <Sparkles size={19} /> Ask Corey <span />
         </button>
       )}
-      {chat && (
-        <section
-          className="chat-panel"
-          role="region"
-          aria-label="Corey booking assistant"
-        >
-          <div className="chat-header">
-            <CoreyAvatar />
-            <div>
-              <strong>Corey the Courier</strong>
-              <small>Your delivery sidekick · scripted preview</small>
-            </div>
-            <button
-              ref={closeChat}
-              className="icon-button"
-              aria-label="Close Corey"
-              onClick={() => {
-                setChat(false);
-                lastFocus.current?.focus();
-              }}
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <div className="chat-content" aria-live="polite">
-            <p className="chat-disclaimer">
-              Scripted demo · use sample details. No AI model is connected.
-            </p>
-            <div className="bubble">
-              Hey there! I’m Corey. Let’s take an errand off your list. I’ll
-              gather your account and delivery details, then we’ll review your
-              package and timing.
-            </div>
-            {messages.map((m, i) => (
-              <React.Fragment key={i}>
-                <div className="bubble">{m.question}</div>
-                <div className="bubble user-bubble">{m.answer}</div>
-              </React.Fragment>
-            ))}
-            <div className="bubble">
-              {chatIndex < chatFields.length
-                ? chatFields[chatIndex][1]
-                : "Nice! Your details are ready in the booking form. Next, preview email verification and choose your package and timing. In the full app, I’ll handle those steps and booking right here."}
-            </div>
-            {chatIndex === chatFields.length && (
-              <button
-                className="button"
-                onClick={() => {
-                  start();
-                  setStep(0);
-                  setChat(false);
-                }}
-              >
-                Review delivery details <ArrowRight size={17} />
-              </button>
-            )}
-            <div ref={chatEnd} />
-          </div>
-          {chatIndex < chatFields.length && (
-            <form className="chat-input" onSubmit={reply}>
-              <label className="sr-only" htmlFor="chat-reply">
-                Reply to Corey
-              </label>
-              <input
-                id="chat-reply"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Type your reply…"
-                autoComplete="off"
-              />
-              <button
-                className="icon-button"
-                aria-label="Send reply"
-                type="submit"
-              >
-                <Send size={20} />
-              </button>
-            </form>
-          )}
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          )}
-          <button
-            className="chat-switch"
-            onClick={() => {
-              start();
-              setChat(false);
-            }}
-          >
-            Prefer a form? Continue there <ArrowUpRight size={13} />
-          </button>
-        </section>
-      )}
+      <CoreyChat
+        open={chat}
+        data={data}
+        user={user}
+        onClose={() => {
+          setChat(false);
+          lastFocus.current?.focus();
+        }}
+        onForm={() => {
+          start();
+          setChat(false);
+        }}
+        onDraft={(draft) => {
+          setData((d) => ({ ...d, ...draft }));
+          setQuote(null);
+          setAccepted(false);
+        }}
+        onUser={(u) => {
+          setUser(u);
+          setVerified(true);
+        }}
+      />
       {inbox && (
         <div className="modal-overlay">
           <section
