@@ -1,6 +1,6 @@
 # CoreRunner Courier
 
-A local full-stack portfolio application for a fictional Atlanta courier service. React provides the customer and dispatch experiences; an Express API and SQLite own accounts, quotes, bookings, assignments, status events, and simulated payment records. Open this folder in VS Code. Agreed product requirements remain in [PROJECT_BLUEPRINT.md](PROJECT_BLUEPRINT.md).
+A local full-stack portfolio application for a fictional Atlanta courier service. React provides customer, dispatch, and courier experiences; an Express API and SQLite own accounts, quotes, bookings, assignments, handoff proof, status events, and simulated payment records. Open this folder in VS Code. Agreed product requirements remain in [PROJECT_BLUEPRINT.md](PROJECT_BLUEPRINT.md).
 
 ## Run in VS Code
 
@@ -33,9 +33,13 @@ Browser tests use installed Google Chrome on macOS when available, otherwise Pla
 4. Open My deliveries to see your saved booking and simulated email inbox. Refresh the browser; the session and records remain available.
 5. Open Demo dispatch in the footer and explicitly enter the local demo staff role. Assign an available sample courier. Move to heading to pickup, then picked up; pickup captures the simulated original charge once.
 6. Follow the recipient tracking link in a private browser window. It works without an account and exposes only status, service, courier, and the event timeline. It grants no booking-management permission.
-7. For an attended delivery, dispatch can advance to heading to delivery, record recipient unavailable, start a return, and document who received the return. The backend adds the previously disclosed demo return distance/time charge, without another pickup or expedited fee. There is no wait timer.
+7. Open Demo courier in the footer and choose the assigned courier. Advance through pickup and the delivery route. Only that courier can access and complete the assigned job.
+8. Choose Record delivery proof. For an attended delivery, enter the recipient PIN from the simulated inbox under My deliveries, or have the receiving person enter their name, draw a signature, and confirm receipt. The courier does not receive the PIN through their API.
+9. For an authorized unattended delivery, select a sample photo and confirm the package is at a suitable drop-off location. The server rejects completion without sender consent and valid image evidence. Photos are normalized to WebP and stored privately in SQLite; they are not served from the public directory.
+10. If nobody answers for an attended delivery, choose No one answered. A same-day return is scheduled immediately, with no waiting period. The courier can optionally choose Ask sender. In My deliveries, the sender explicitly authorizes unattended delivery; the courier refreshes and can then complete with a photo, without a return fee.
+11. Alternatively, choose Start return now. That closes the sender authorization window. At the sender's address, Record return handoff captures the receiving person's name, signature, and receipt consent. The backend records the disclosed return distance/time charge once, without another pickup or expedited fee. Completion releases the courier for a new assignment.
 
-No successful-delivery bypass is provided: signature/PIN/photo proof and the dedicated courier interface are the next work. Grocery bookings remain pending and cannot be assigned until the readiness-review feature is implemented. The selected screenshot is not uploaded or accepted in this version.
+There is no generic completion bypass in dispatch. Delivered and returned statuses require evidence from the assigned courier. Grocery bookings remain pending and cannot be assigned until the readiness-review feature is implemented. Grocery screenshot selection is still a local placeholder, separate from the implemented delivery-photo upload.
 
 ## What is real and what is simulated
 
@@ -44,7 +48,9 @@ No successful-delivery bypass is provided: signature/PIN/photo proof and the ded
 | Accounts, expiring sessions, browser-bound single-use verification challenges | Email delivery and mailbox ownership verification are simulated |
 | Quotes, 15-minute expiry, accepted snapshot, duplicate-request protection | Rates are illustrative fixtures, not approved commercial prices |
 | Server validation of weight, service and date | City-name matching is a demo coverage check, not address validation |
-| Staff-gated dispatch API, approved roster, one active job per courier | Demo staff entry grants a local role; no production staff authentication or shift planning |
+| Staff-gated dispatch API, courier-scoped sessions, approved roster, one active job per courier | Demo role entry grants local access; no production staff authentication or shift planning |
+| PIN verification, captured signatures, normalized delivery photos and proof history | The app records evidence; it does not independently establish signer identity or confirm photo contents |
+| Sender-only unattended authorization, immediate return scheduling, signed returns | No outgoing contact is sent; after-hours exceptions and other failure causes remain unfinished |
 | Pickup capture, return charge, ledger and event history | No real money movement, card processing, cancellation, or refunds yet |
 | Recipient tracking tokens with expiration | No phone GPS, maps, ETA or automatic live updates yet |
 | Customer-scoped notification history | Demo inbox includes sender and recipient copies; nothing is sent |
@@ -59,20 +65,39 @@ The demo adapter uses $5 pickup, $1.25 per fixture mile, $0.20 per fixture minut
 
 Demo city matching supports Atlanta, Decatur, Marietta, Alpharetta, Lawrenceville, and Peachtree City. Real polygons, geocoding, cutoff enforcement, capacity scheduling, vehicle constraints, dimensions, multiple packages, cold-item handling, and holiday hours remain open. Scheduled dates must not be in the past, but an offered window does not assert live availability. One active delivery per courier conservatively reserves return capacity; it is not optimized scheduling.
 
-The implemented return branch models recipient unavailability only. Other failure reasons, company-caused returns, sender authorization after failure, and return exceptions require further work. Return recipient entry is a demo staff record, not a completed signature-verification integration. Never infer delivery from location or bypass proof requirements.
+The implemented return branch models recipient unavailability only. Other failure reasons, company-caused returns, after-hours exceptions, and unavailable senders require further work. A same-day due date is recorded in Atlanta time, but this is not an automated feasibility or scheduling guarantee. The initial return-proof implementation uses a captured signature; unattended returns and alternative return-PIN policies are not yet implemented.
+
+## Proof and authorization rules
+
+- New bookings receive a random six-digit PIN in a recipient-addressed simulated email. My deliveries includes recipient copies solely for the local demo walkthrough. PIN hashes are stored separately from bookings; neither tracking links nor courier listings expose them. Five incorrect attempts block PIN retries for five minutes. A captured signature remains available.
+- Successful delivery or return consumes the PIN and records a single proof. Repeating the same submission does not duplicate proof, notifications, or charges.
+- Signatures contain the receiving person's name, explicit receipt consent, and normalized drawing points. Presence validation rejects empty marks; it is not biometric or legal identity verification.
+- Delivery photos must decode as JPEG, PNG, or WebP, fit within 4 MB and 24 million pixels, and contain a single frame. The server normalizes them, removes metadata including GPS, and restricts retrieval to the sender, assigned courier, or dispatch session. Recipient tracking tokens cannot retrieve evidence.
+- Only the sender account can authorize unattended delivery. Authorization remains open before the return starts. A courier may start a return immediately; if that happens before authorization or photo submission finishes, the backend rejects the conflicting action. Authorization alone does not mark anything delivered.
+- The courier must refresh the workspace to see new sender instructions. Phone GPS and automatic updates remain future work.
+- All evidence is stored in the ignored local database. The existing database gains new tables without removing prior records. Existing already-assigned bookings without a PIN can use a signature; new assignments provision a PIN if needed.
 
 ## Source layout
 
 - `src/main.jsx`: homepage, guided booking, and Corey preview.
 - `src/DeliveryHub.jsx`: customer history, dispatch board, recipient tracking.
+- `src/CourierWorkspace.jsx`: assigned jobs, handoff capture, failed attempts and returns.
+- `src/ProofCapture.jsx`: PIN, signature, photo input and authenticated proof history.
 - `src/api.js`: API requests and display formatting.
 - `src/styles.css`: shared brand and responsive UI.
 - `server/app.js`: authenticated API routes and transactional operations.
 - `server/db.js`: SQLite schema and transactions.
 - `server/domain.js`: validation and labeled sample routing/pricing.
+- `server/proof.js`: signature validation and photo decoding/normalization.
 - `server/index.js`: loopback-only entry point.
 - `scripts/dev.mjs`: starts API and Vite together.
 - `server/app.test.js`: isolation, validation, idempotency, payments, dispatch, persistence, and tracking access checks.
-- `tests/preview.spec.js`: browser flows and responsive screenshots.
+- `tests/preview.spec.js`: booking, dispatch and responsive checks.
+- `tests/handoff.spec.js`: complete PIN and photo deliveries, sender consent, and signed returns in a browser.
+- `tests/fixtures/delivery.png`: a synthetic solid-color image used only as an upload test fixture.
 
 Technical references: [Node SQLite documentation](https://nodejs.org/api/sqlite.html) and [Express API](https://expressjs.com/en/5x/api/). The city scene is original SVG artwork; Lucide provides icons and Google Fonts supplies typography with local fallbacks.
+
+## Hosting direction
+
+The intended destination is Vercel with a hosted database. This local implementation still uses SQLite and is not deployment-ready. Database and image storage must be migrated before deployment, and local demo identity must be replaced or isolated appropriately. The public GitHub repository contains source and synthetic test fixtures, never local proof uploads or account records.

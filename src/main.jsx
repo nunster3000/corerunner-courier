@@ -24,6 +24,7 @@ import {
 import "./styles.css";
 import { api, money } from "./api";
 import DeliveryHub, { RecipientTracking } from "./DeliveryHub";
+import CourierWorkspace from "./CourierWorkspace";
 
 const services = [
   {
@@ -579,7 +580,9 @@ function App() {
         </div>
       </header>
       <main id="main">
-        {page === "tracking" ? (
+        {page === "courier" ? (
+          <CourierWorkspace onBack={goHome} />
+        ) : page === "tracking" ? (
           <RecipientTracking
             token={new URLSearchParams(window.location.search).get("track")}
             onBack={goHome}
@@ -1400,6 +1403,16 @@ function App() {
           <button
             className="text-button"
             onClick={() => {
+              setPage("courier");
+              setChat(false);
+              window.scrollTo(0, 0);
+            }}
+          >
+            Demo courier
+          </button>
+          <button
+            className="text-button"
+            onClick={() => {
               setPage("dispatch");
               window.scrollTo(0, 0);
             }}
@@ -1422,7 +1435,7 @@ function App() {
         </div>
         <small>CoreRunner Courier · Fictional portfolio project</small>
       </footer>
-      {!chat && (
+      {!chat && page !== "courier" && (
         <button className="floating-corey" onClick={openChat}>
           <Sparkles size={19} /> Ask Corey <span />
         </button>

@@ -1,6 +1,7 @@
 import express from "express";
-import { randomBytes, randomUUID, createHash } from "node:crypto";
+import { randomBytes, randomUUID, createHash, randomInt } from "node:crypto";
 import { openDatabase, transaction } from "./db.js";
+import { validateSignature, normalizePhoto } from "./proof.js";
 import {
   Problem,
   fail,
@@ -64,7 +65,7 @@ export function createApp({
       return res.status(415).json({ error: "Use application/json." });
     next();
   });
-  app.use(express.json({ limit: "64kb" }));
+  app.use(express.json({ limit: "6mb" }));
   app.use((req, res, next) => {
     if (
       ["POST", "PATCH", "DELETE"].includes(req.method) &&
@@ -93,6 +94,25 @@ export function createApp({
         .status(403)
         .json({ error: "Open a demo dispatch session first." });
     next();
+  };
+  const courier = (req, res, next) => {
+    const c = db
+      .prepare(
+        "SELECT c.* FROM courier_sessions s JOIN couriers c ON c.id=s.courier_id WHERE s.token=? AND s.expires>?",
+      )
+      .get(hash(cookies(req).cr_courier), Date.now());
+    if (!c)
+      return res
+        .status(403)
+        .json({ error: "Open a demo courier session first." });
+    req.courier = c;
+    next();
+  };
+  const assigned = (req) => {
+    const b = read(req.params.id);
+    if (b.courier?.id !== req.courier.id)
+      fail(404, "This delivery is not assigned to you.");
+    return b;
   };
   const demoOnly = (req, res, next) =>
     demo
@@ -127,15 +147,38 @@ export function createApp({
         "INSERT INTO payments(booking_id,kind,amount,created) VALUES(?,?,?,?)",
       )
       .run(b.id, kind, amount, stamp());
-  const notify = (b, subject, body) => {
+  const notify = (b, subject, body, recipients) => {
     const u = db.prepare("SELECT email FROM users WHERE id=?").get(b.userId);
-    for (const recipient of new Set([u.email, b.delivery.recipientEmail]))
+    for (const recipient of new Set(
+      recipients || [u.email, b.delivery.recipientEmail],
+    ))
       db.prepare(
         "INSERT INTO notifications(user_id,recipient,subject,body,created) VALUES(?,?,?,?,?)",
       ).run(b.userId, recipient, subject, body, stamp());
   };
+  const ensurePin = (b) => {
+    if (db.prepare("SELECT 1 FROM handoff_codes WHERE booking_id=?").get(b.id))
+      return;
+    const pin = String(randomInt(100000, 1000000));
+    db.prepare(
+      "INSERT INTO handoff_codes(booking_id,code_hash) VALUES(?,?)",
+    ).run(b.id, hash(b.id + ":" + pin));
+    notify(
+      b,
+      `Delivery PIN for ${b.id}`,
+      `Your handoff PIN is ${pin}. Share it with your courier only when you receive the package. Demo email; nothing was sent.`,
+      [b.delivery.recipientEmail],
+    );
+  };
+  const proofSummary = (id) =>
+    db
+      .prepare(
+        "SELECT id,leg,method,created FROM proofs WHERE booking_id=? ORDER BY created",
+      )
+      .all(id);
   const present = (b) => ({
     ...b,
+    proofs: proofSummary(b.id),
     events: db
       .prepare(
         "SELECT kind,created,detail FROM events WHERE booking_id=? ORDER BY id",
@@ -309,6 +352,7 @@ export function createApp({
         b.id,
         Date.now() + 30 * 86400000,
       );
+      ensurePin(b);
       payment(b, "authorization", q.price.total);
       event(b, req.user.id, "booking_created", {
         unattended: b.delivery.unattended,
@@ -409,6 +453,7 @@ export function createApp({
           409,
           "This courier already has an active delivery and reserved return capacity.",
         );
+      ensurePin(b);
       b.courier = c;
       b.status = "assigned";
       save(b);
@@ -425,61 +470,327 @@ export function createApp({
     });
     res.json({ booking: present(b) });
   });
-  app.post("/api/dispatch/:id/advance", staff, (req, res) => {
+  // Both operator and courier status actions use the same transition rules.
+  function advance(req, res, asCourier) {
     const b = transaction(db, () => {
-      const b = read(req.params.id);
-      const target = req.body.status;
+      const b = asCourier ? assigned(req) : read(req.params.id);
+      const actor = asCourier ? req.courier.id : "demo-dispatch",
+        target = req.body.status;
       const allowed = {
         assigned: ["heading_to_pickup"],
         heading_to_pickup: ["picked_up"],
         picked_up: ["heading_to_delivery"],
         heading_to_delivery: ["handoff_failed"],
         handoff_failed: ["returning"],
-        returning: ["returned"],
+        return_scheduled: ["returning"],
       };
       if (!allowed[b.status]?.includes(target))
-        fail(409, "That status change is not allowed.");
+        fail(
+          409,
+          "That status change is not allowed. Delivery and return completion require proof.",
+        );
       if (target === "handoff_failed" && b.delivery.unattended)
         fail(
           409,
           "This booking allows unattended delivery. A missing signature is not a valid failure reason.",
         );
-      if (target === "returned")
-        text(req.body.receivedBy, "Return recipient", 100);
       b.status = target;
       if (target === "picked_up") {
         b.paymentStatus = "captured";
         payment(b, "capture", b.price.total);
       }
-      if (target === "handoff_failed")
+      if (target === "handoff_failed") {
         b.returnReason = "Recipient unavailable for signature or PIN";
-      if (target === "returned") {
-        payment(b, "return_charge", b.price.returnTotal);
-        b.returnReceivedBy = req.body.receivedBy;
+        b.status = "return_scheduled";
+        b.returnDueDate = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/New_York",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date());
+        event(b, actor, "handoff_failed", { reason: b.returnReason });
       }
       save(b);
-      event(
-        b,
-        "demo-dispatch",
-        target,
-        target === "returned" ? { receivedBy: b.returnReceivedBy } : {},
-      );
+      event(b, actor, b.status, {
+        ...(target === "returning" ? { authorizationWindowClosed: true } : {}),
+      });
       notify(
         b,
-        `CoreRunner ${b.id}: ${target.replaceAll("_", " ")}`,
-        "Demo status updated. See the delivery record for details.",
+        `CoreRunner ${b.id}: ${b.status.replaceAll("_", " ")}`,
+        target === "handoff_failed"
+          ? "A handoff was attempted but no recipient was available. Same-day return is scheduled with the assigned courier. No wait is required."
+          : "Demo status updated. See your delivery for details.",
       );
       return b;
     });
     res.json({ booking: present(b) });
+  }
+  app.post("/api/dispatch/:id/advance", staff, (req, res) =>
+    advance(req, res, false),
+  );
+  app.get("/api/demo/couriers", demoOnly, (req, res) =>
+    res.json({ couriers: db.prepare("SELECT * FROM couriers").all() }),
+  );
+  app.post("/api/demo/courier-session", demoOnly, (req, res) => {
+    const c = db
+      .prepare("SELECT * FROM couriers WHERE id=?")
+      .get(String(req.body.courierId));
+    if (!c) fail(400, "Choose an approved courier.");
+    const token = secret();
+    db.prepare("INSERT INTO courier_sessions VALUES(?,?,?)").run(
+      hash(token),
+      c.id,
+      Date.now() + 3600000,
+    );
+    cookie(res, "cr_courier", token, 3600000);
+    res.json({ courier: c, simulated: true });
   });
-  // This first slice deliberately has no generic "mark delivered" endpoint: proof-of-delivery comes next.
+  app.get("/api/courier", courier, (req, res) =>
+    res.json({
+      courier: req.courier,
+      bookings: db
+        .prepare("SELECT id FROM bookings ORDER BY rowid DESC")
+        .all()
+        .map((r) => read(r.id))
+        .filter((b) => b.courier?.id === req.courier.id)
+        .map((b) => {
+          const { trackingToken, userId, quoteId, price, payments, ...job } =
+            present(b);
+          return job;
+        }),
+    }),
+  );
+  app.post("/api/courier/:id/advance", courier, (req, res) =>
+    advance(req, res, true),
+  );
+  app.post("/api/courier/:id/contact-sender", courier, (req, res) => {
+    const b = transaction(db, () => {
+      const b = assigned(req);
+      if (!["handoff_failed", "return_scheduled"].includes(b.status))
+        fail(
+          409,
+          "Sender authorization is available only before a failed handoff return begins.",
+        );
+      if (!b.contactRequested) {
+        b.contactRequested = stamp();
+        save(b);
+        event(b, req.courier.id, "sender_contact_requested");
+        const u = db
+          .prepare("SELECT email FROM users WHERE id=?")
+          .get(b.userId);
+        notify(
+          b,
+          `Your authorization is requested for ${b.id}`,
+          "Your courier has optionally requested unattended delivery. Sign in to My deliveries to authorize it. The courier can start the same-day return without waiting.",
+          [u.email],
+        );
+      }
+      return b;
+    });
+    res.json({ ok: true, contactRequested: b.contactRequested });
+  });
+  app.post("/api/bookings/:id/unattended", auth, (req, res) => {
+    const b = transaction(db, () => {
+      const b = owned(req);
+      if (req.body.authorize !== true)
+        fail(400, "Explicit sender authorization is required.");
+      if (
+        !["heading_to_delivery", "handoff_failed", "return_scheduled"].includes(
+          b.status,
+        )
+      )
+        fail(
+          409,
+          "Authorization is no longer available. The return may already be underway.",
+        );
+      if (!b.delivery.unattended) {
+        b.delivery.unattended = true;
+        b.unattendedAuthorizedAt = stamp();
+        b.unattendedAuthorizedBy = req.user.id;
+        save(b);
+        event(b, req.user.id, "unattended_authorized");
+        notify(
+          b,
+          `Unattended delivery authorized for ${b.id}`,
+          "The sender authorized a photo-confirmed drop-off. The courier must still confirm a suitable location. A return remains available if drop-off is not possible.",
+        );
+      }
+      return b;
+    });
+    res.json({ booking: present(b) });
+  });
+  app.post("/api/courier/:id/complete", courier, async (req, res) => {
+    assigned(req);
+    const key = text(req.get("Idempotency-Key"), "Idempotency key", 100),
+      method = req.body.method,
+      leg = req.body.leg;
+    if (!["delivery", "return"].includes(leg))
+      fail(400, "Choose delivery or return proof.");
+    if (
+      !["pin", "signature", "photo"].includes(method) ||
+      (leg === "return" && method !== "signature")
+    )
+      fail(400, "Return handoff requires the receiving person’s signature.");
+    const earlier = db
+      .prepare("SELECT * FROM proofs WHERE booking_id=? AND request_key=?")
+      .get(req.params.id, key);
+    if (earlier) {
+      if (earlier.leg !== leg || earlier.method !== method)
+        fail(409, "Request key already used for different proof.");
+      return res.json({ booking: present(assigned(req)), reused: true });
+    }
+    let payload = {},
+      image = null;
+    if (method === "signature") payload = validateSignature(req.body);
+    if (method === "photo") {
+      if (req.body.safeLocation !== true)
+        fail(
+          400,
+          "Confirm that the package is at a suitable drop-off location.",
+        );
+      image = await normalizePhoto(req.body.photo);
+      payload = { safeLocation: true };
+    }
+    const result = transaction(db, () => {
+      const b = assigned(req);
+      const existing = db
+        .prepare("SELECT * FROM proofs WHERE booking_id=? AND request_key=?")
+        .get(b.id, key);
+      if (existing) {
+        if (existing.leg !== leg || existing.method !== method)
+          fail(409, "Request key already used for different proof.");
+        return { booking: present(b), reused: true };
+      }
+      const canDeliver =
+        b.status === "heading_to_delivery" ||
+        (["return_scheduled", "handoff_failed"].includes(b.status) &&
+          b.delivery.unattended &&
+          method === "photo");
+      if (
+        (leg === "delivery" && !canDeliver) ||
+        (leg === "return" && b.status !== "returning")
+      )
+        fail(
+          409,
+          "This handoff is not available in the current delivery state. Refresh your job.",
+        );
+      if (leg === "delivery" && method === "photo" && !b.delivery.unattended)
+        fail(403, "Only the sender can authorize unattended delivery.");
+      if (method === "pin") {
+        const code = db
+          .prepare("SELECT * FROM handoff_codes WHERE booking_id=?")
+          .get(b.id);
+        if (!code || code.used)
+          fail(
+            409,
+            "The handoff PIN is unavailable. Use a recipient signature.",
+          );
+        if (code.blocked_until > Date.now())
+          return {
+            error:
+              "Too many incorrect PIN attempts. Wait five minutes or capture a signature.",
+            status: 429,
+          };
+        if (
+          !/^\d{6}$/.test(String(req.body.pin || "")) ||
+          hash(b.id + ":" + req.body.pin) !== code.code_hash
+        ) {
+          const attempts = code.blocked_until ? 1 : code.attempts + 1;
+          db.prepare(
+            "UPDATE handoff_codes SET attempts=?,blocked_until=? WHERE booking_id=?",
+          ).run(attempts, attempts >= 5 ? Date.now() + 300000 : 0, b.id);
+          return {
+            error:
+              attempts >= 5
+                ? "Too many incorrect PIN attempts. Wait five minutes or capture a signature."
+                : "The PIN did not match. Ask the recipient to check it.",
+            status: attempts >= 5 ? 429 : 400,
+          };
+        }
+      }
+      const proofId = randomUUID(),
+        created = stamp();
+      db.prepare("INSERT INTO proofs VALUES(?,?,?,?,?,?,?,?,?)").run(
+        proofId,
+        b.id,
+        leg,
+        method,
+        req.courier.id,
+        created,
+        JSON.stringify(payload),
+        image,
+        key,
+      );
+      if (leg === "return") {
+        b.status = "returned";
+        b.returnReceivedBy = payload.signer;
+        payment(b, "return_charge", b.price.returnTotal);
+      } else {
+        b.status = "delivered";
+        b.deliveredAt = created;
+      }
+      db.prepare("UPDATE handoff_codes SET used=1 WHERE booking_id=?").run(
+        b.id,
+      );
+      save(b);
+      event(b, req.courier.id, b.status, { proofId, method, leg });
+      notify(
+        b,
+        `CoreRunner ${b.id}: ${b.status}`,
+        `Handoff recorded with ${method === "pin" ? "a recipient PIN" : method === "photo" ? "a delivery photo" : "a recipient signature"}. ${leg === "return" ? "The disclosed return distance and time charge has been recorded." : ""}`,
+      );
+      return { booking: present(b), reused: false };
+    });
+    if (result.error)
+      return res.status(result.status).json({ error: result.error });
+    res.json(result);
+  });
+  app.get("/api/bookings/:id/proofs/:proofId", (req, res) => {
+    const b = read(req.params.id),
+      cs = cookies(req);
+    const user = db
+      .prepare("SELECT user_id FROM sessions WHERE token=? AND expires>?")
+      .get(hash(cs.cr_session), Date.now());
+    const isStaff = db
+      .prepare("SELECT 1 FROM staff_sessions WHERE token=? AND expires>?")
+      .get(hash(cs.cr_staff), Date.now());
+    const c = db
+      .prepare(
+        "SELECT courier_id FROM courier_sessions WHERE token=? AND expires>?",
+      )
+      .get(hash(cs.cr_courier), Date.now());
+    if (
+      user?.user_id !== b.userId &&
+      !isStaff &&
+      (!c || c.courier_id !== b.courier?.id)
+    )
+      fail(404, "Proof not found.");
+    const proof = db
+      .prepare("SELECT * FROM proofs WHERE id=? AND booking_id=?")
+      .get(req.params.proofId, b.id);
+    if (!proof) fail(404, "Proof not found.");
+    if (req.query.image === "1") {
+      if (!proof.image) fail(404, "Photo not found.");
+      return res.type("image/webp").send(Buffer.from(proof.image));
+    }
+    res.json({
+      id: proof.id,
+      leg: proof.leg,
+      method: proof.method,
+      created: proof.created,
+      ...JSON.parse(proof.payload),
+    });
+  });
   app.use("/api", (req, res) =>
     res.status(404).json({ error: "Endpoint not found." }),
   );
   app.use((error, req, res, next) => {
     if (error instanceof Problem)
       return res.status(error.status).json({ error: error.message });
+    if (error.type === "entity.too.large")
+      return res
+        .status(413)
+        .json({ error: "Photo request is too large. Use a photo under 4 MB." });
     if (error instanceof SyntaxError && error.status === 400)
       return res.status(400).json({ error: "Invalid JSON." });
     console.error(error);

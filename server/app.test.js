@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createApp } from "./app.js";
+import sharp from "sharp";
 const sample = {
   name: "Alex Test",
   email: "alex@example.com",
@@ -218,12 +219,14 @@ test("pickup captures once, return has no second pickup fee, tracking omits priv
     );
   assert.equal(
     (await c(`/dispatch/${b.id}/advance`, { status: "returned" })).status,
-    400,
+    409,
   );
-  const returned = await c(`/dispatch/${b.id}/advance`, {
-    status: "returned",
-    receivedBy: "Alex",
-  });
+  await c("/demo/courier-session", { courierId: "cr-01" });
+  const returned = await c(
+    `/courier/${b.id}/complete`,
+    { leg: "return", method: "signature", ...signature },
+    { "Idempotency-Key": "signed-return" },
+  );
   assert.equal(returned.status, 200);
   assert.equal(
     returned.body.booking.payments.find((p) => p.kind === "return_charge")
@@ -279,4 +282,299 @@ test("external browser writes rejected; demo auth and staff access can be disabl
     disabled = f.client();
   assert.equal((await disabled("/auth/request", sample)).status, 404);
   assert.equal((await disabled("/demo/dispatch-session", {})).status, 404);
+});
+
+const signature = {
+  signer: "Jamie Test",
+  consent: true,
+  strokes: [
+    [
+      [0.1, 0.2],
+      [0.2, 0.5],
+      [0.3, 0.2],
+      [0.5, 0.6],
+    ],
+  ],
+};
+async function prepared(t, overrides = {}) {
+  const f = await fixture(t),
+    sender = f.client(),
+    courier = f.client(),
+    other = f.client();
+  await login(sender);
+  const b = await book(sender, overrides);
+  await sender("/demo/dispatch-session", {});
+  await sender(`/dispatch/${b.id}/assign`, { courierId: "cr-01" });
+  await courier("/demo/courier-session", { courierId: "cr-01" });
+  await other("/demo/courier-session", { courierId: "cr-02" });
+  for (const status of [
+    "heading_to_pickup",
+    "picked_up",
+    "heading_to_delivery",
+  ])
+    assert.equal(
+      (await courier(`/courier/${b.id}/advance`, { status })).status,
+      200,
+    );
+  return { ...f, sender, courier, other, b };
+}
+async function image() {
+  const png = await sharp({
+    create: { width: 60, height: 40, channels: 3, background: "#2450d8" },
+  })
+    .png()
+    .toBuffer();
+  return "data:image/png;base64," + png.toString("base64");
+}
+async function pinFor(sender, id) {
+  const messages = (await sender("/inbox")).body.messages;
+  return messages
+    .find((m) => m.subject === `Delivery PIN for ${id}`)
+    .body.match(/PIN is (\d{6})/)[1];
+}
+test("only assigned courier can complete a handoff and valid PIN produces one proof", async (t) => {
+  const { sender, courier, other, client, b, db } = await prepared(t);
+  const pin = await pinFor(sender, b.id),
+    body = { leg: "delivery", method: "pin", pin },
+    headers = { "Idempotency-Key": "pin-handoff" };
+  assert.equal(
+    (await other(`/courier/${b.id}/complete`, body, headers)).status,
+    404,
+  );
+  assert.equal(
+    (await sender(`/courier/${b.id}/complete`, body, headers)).status,
+    403,
+  );
+  assert.equal(
+    (
+      await courier(
+        `/courier/${b.id}/complete`,
+        { ...body, pin: "000000" },
+        headers,
+      )
+    ).status,
+    400,
+  );
+  const r = await courier(`/courier/${b.id}/complete`, body, headers);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.booking.status, "delivered");
+  assert.equal(
+    (await courier(`/courier/${b.id}/complete`, body, headers)).body.reused,
+    true,
+  );
+  assert.equal(db.prepare("SELECT count(*) AS n FROM proofs").get().n, 1);
+  const id = r.body.booking.proofs[0].id;
+  assert.equal((await client()(`/bookings/${b.id}/proofs/${id}`)).status, 404);
+  assert.equal((await other(`/bookings/${b.id}/proofs/${id}`)).status, 404);
+  assert.equal(
+    (await sender(`/bookings/${b.id}/proofs/${id}`)).body.method,
+    "pin",
+  );
+  const tracking = (await client()("/track/" + b.trackingToken)).body;
+  assert.equal(tracking.status, "delivered");
+  assert.equal(tracking.proofs, undefined);
+  assert.equal(tracking.pin, undefined);
+});
+test("PIN lockout persists and a signature remains available without bypassing proof", async (t) => {
+  const { sender, courier, b, db } = await prepared(t);
+  const body = { leg: "delivery", method: "pin", pin: "000000" },
+    headers = { "Idempotency-Key": "locked" };
+  for (let i = 0; i < 5; i++)
+    assert.equal(
+      (await courier(`/courier/${b.id}/complete`, body, headers)).status,
+      i === 4 ? 429 : 400,
+    );
+  assert.equal(
+    (
+      await courier(
+        `/courier/${b.id}/complete`,
+        { ...body, pin: await pinFor(sender, b.id) },
+        headers,
+      )
+    ).status,
+    429,
+  );
+  assert.equal(
+    db
+      .prepare("SELECT attempts FROM handoff_codes WHERE booking_id=?")
+      .get(b.id).attempts,
+    5,
+  );
+  assert.equal(
+    (
+      await courier(
+        `/courier/${b.id}/complete`,
+        { leg: "delivery", method: "signature", ...signature, strokes: [] },
+        { "Idempotency-Key": "empty" },
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await courier(
+        `/courier/${b.id}/complete`,
+        { leg: "delivery", method: "signature", ...signature, consent: false },
+        { "Idempotency-Key": "consent" },
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await courier(
+        `/courier/${b.id}/complete`,
+        { leg: "delivery", method: "signature", ...signature },
+        { "Idempotency-Key": "signature" },
+      )
+    ).body.booking.status,
+    "delivered",
+  );
+});
+test("photo completion needs sender authorization and valid image bytes", async (t) => {
+  const { sender, courier, b, db } = await prepared(t);
+  const photo = await image(),
+    headers = { "Idempotency-Key": "photo" };
+  const body = { leg: "delivery", method: "photo", photo, safeLocation: true };
+  assert.equal(
+    (await courier(`/courier/${b.id}/complete`, body, headers)).status,
+    403,
+  );
+  assert.equal(
+    (await courier(`/bookings/${b.id}/unattended`, { authorize: true })).status,
+    401,
+  );
+  assert.equal(
+    (await sender(`/bookings/${b.id}/unattended`, { authorize: false })).status,
+    400,
+  );
+  await sender(`/bookings/${b.id}/unattended`, { authorize: true });
+  assert.equal(
+    (
+      await courier(
+        `/courier/${b.id}/complete`,
+        { ...body, photo: "data:image/png;base64,aGVsbG8=" },
+        headers,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await courier(
+        `/courier/${b.id}/complete`,
+        { ...body, safeLocation: false },
+        headers,
+      )
+    ).status,
+    400,
+  );
+  const results = await Promise.all([
+    courier(`/courier/${b.id}/complete`, body, headers),
+    courier(`/courier/${b.id}/complete`, body, headers),
+  ]);
+  assert.ok(results.every((r) => r.status === 200));
+  assert.equal(db.prepare("SELECT count(*) AS n FROM proofs").get().n, 1);
+  const proof = db
+    .prepare("SELECT image FROM proofs WHERE booking_id=?")
+    .get(b.id);
+  const meta = await sharp(Buffer.from(proof.image)).metadata();
+  assert.equal(meta.format, "webp");
+  assert.equal(meta.exif, undefined);
+});
+test("failed handoff schedules immediate return; optional sender consent permits photo completion without return fee", async (t) => {
+  const { sender, courier, b, db } = await prepared(t);
+  const failed = await courier(`/courier/${b.id}/advance`, {
+    status: "handoff_failed",
+  });
+  assert.equal(failed.body.booking.status, "return_scheduled");
+  assert.ok(failed.body.booking.returnDueDate);
+  await courier(`/courier/${b.id}/contact-sender`, {});
+  await courier(`/courier/${b.id}/contact-sender`, {});
+  assert.equal(
+    db
+      .prepare(
+        "SELECT count(*) AS n FROM events WHERE kind='sender_contact_requested'",
+      )
+      .get().n,
+    1,
+  );
+  const authorized = await sender(`/bookings/${b.id}/unattended`, {
+    authorize: true,
+  });
+  assert.equal(authorized.body.booking.delivery.unattended, true);
+  const result = await courier(
+    `/courier/${b.id}/complete`,
+    {
+      leg: "delivery",
+      method: "photo",
+      photo: await image(),
+      safeLocation: true,
+    },
+    { "Idempotency-Key": "after-failure" },
+  );
+  assert.equal(result.body.booking.status, "delivered");
+  assert.equal(
+    db
+      .prepare("SELECT count(*) AS n FROM payments WHERE kind='return_charge'")
+      .get().n,
+    0,
+  );
+});
+test("return beginning closes authorization and signed return charges only once", async (t) => {
+  const { sender, courier, b, db } = await prepared(t);
+  await courier(`/courier/${b.id}/advance`, { status: "handoff_failed" });
+  assert.equal(
+    (await courier(`/courier/${b.id}/advance`, { status: "returning" })).status,
+    200,
+  );
+  assert.equal(
+    (await sender(`/bookings/${b.id}/unattended`, { authorize: true })).status,
+    409,
+  );
+  assert.equal(
+    (await courier(`/courier/${b.id}/contact-sender`, {})).status,
+    409,
+  );
+  assert.equal(
+    (
+      await courier(
+        `/courier/${b.id}/complete`,
+        { leg: "delivery", method: "signature", ...signature },
+        { "Idempotency-Key": "wrong-leg" },
+      )
+    ).status,
+    409,
+  );
+  const body = { leg: "return", method: "signature", ...signature },
+    headers = { "Idempotency-Key": "return" };
+  assert.equal(
+    (await courier(`/courier/${b.id}/complete`, body, headers)).body.booking
+      .status,
+    "returned",
+  );
+  assert.equal(
+    (await courier(`/courier/${b.id}/complete`, body, headers)).body.reused,
+    true,
+  );
+  assert.equal(
+    db
+      .prepare(
+        "SELECT amount FROM payments WHERE booking_id=? AND kind='return_charge'",
+      )
+      .get(b.id).amount,
+    b.price.returnTotal,
+  );
+  assert.equal(
+    db
+      .prepare("SELECT count(*) AS n FROM payments WHERE kind='return_charge'")
+      .get().n,
+    1,
+  );
+  const second = await book(sender);
+  assert.equal(
+    (await sender(`/dispatch/${second.id}/assign`, { courierId: "cr-01" }))
+      .status,
+    200,
+  );
 });

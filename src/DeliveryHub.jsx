@@ -10,6 +10,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { api, money, statusLabel } from "./api";
+import { ProofHistory } from "./ProofCapture";
 export default function DeliveryHub({ mode, onBack, onBook }) {
   const [bookings, setBookings] = useState([]),
     [couriers, setCouriers] = useState([]),
@@ -18,7 +19,7 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
     [busy, setBusy] = useState(false),
     [ready, setReady] = useState(mode !== "dispatch"),
     [selected, setSelected] = useState({}),
-    [received, setReceived] = useState({});
+    [authorization, setAuthorization] = useState({});
   async function load() {
     setError("");
     setBusy(true);
@@ -57,7 +58,7 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
     heading_to_pickup: "picked_up",
     picked_up: "heading_to_delivery",
     handoff_failed: "returning",
-    returning: "returned",
+    return_scheduled: "returning",
   };
   return (
     <section className="container hub-page">
@@ -103,8 +104,8 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
             <p>
               Local-only role switch with sample couriers. Manual assignment
               reserves one courier for the delivery and its possible return.
-              Live scheduling, readiness review, and delivery proof are not
-              connected yet.
+              Open Demo courier to record PIN, signature, or photo proof. Live
+              scheduling and grocery readiness review are not connected yet.
             </p>
             {!ready && (
               <button
@@ -294,26 +295,12 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
               )}
               {mode === "dispatch" && next[b.status] && (
                 <div className="assign-controls">
-                  {b.status === "returning" && (
-                    <input
-                      aria-label={"Return recipient for " + b.id}
-                      placeholder="Return received by"
-                      value={received[b.id] || ""}
-                      onChange={(e) =>
-                        setReceived({ ...received, [b.id]: e.target.value })
-                      }
-                    />
-                  )}
                   <button
                     className="button compact"
-                    disabled={
-                      busy ||
-                      (b.status === "returning" && !received[b.id]?.trim())
-                    }
+                    disabled={busy}
                     onClick={() =>
                       act(`/dispatch/${b.id}/advance`, {
                         status: next[b.status],
-                        receivedBy: received[b.id],
                       })
                     }
                   >
@@ -337,12 +324,63 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
                   </button>
                 )}
             </div>
-            {mode === "dispatch" && b.status === "heading_to_delivery" && (
-              <p className="prototype-note">
-                Successful completion will require the proof-of-delivery
-                integration. There is no button to bypass the required proof.
-              </p>
-            )}
+            {mode !== "dispatch" &&
+              [
+                "heading_to_delivery",
+                "return_scheduled",
+                "handoff_failed",
+              ].includes(b.status) &&
+              !b.delivery.unattended && (
+                <div className="sender-authorization">
+                  <h3>Your handoff instructions</h3>
+                  <p>
+                    {b.contactRequested
+                      ? "Your courier requested permission for an unattended drop-off."
+                      : "You can authorize an unattended drop-off while the courier is still at the delivery stage."}{" "}
+                    A photo is required. Once the courier starts the return,
+                    this option closes.
+                  </p>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={!!authorization[b.id]}
+                      onChange={(e) =>
+                        setAuthorization({
+                          ...authorization,
+                          [b.id]: e.target.checked,
+                        })
+                      }
+                    />
+                    <span>I authorize unattended delivery for {b.id}.</span>
+                  </label>
+                  <button
+                    className="button compact"
+                    disabled={busy || !authorization[b.id]}
+                    onClick={() =>
+                      act(`/bookings/${b.id}/unattended`, { authorize: true })
+                    }
+                  >
+                    Authorize unattended delivery
+                  </button>
+                </div>
+              )}
+            {b.returnDueDate &&
+              ["return_scheduled", "handoff_failed", "returning"].includes(
+                b.status,
+              ) && (
+                <p className="info-note">
+                  Same-day return due {b.returnDueDate}. The assigned courier
+                  retains the package and reserved return capacity.
+                </p>
+              )}
+            <ProofHistory booking={b} />
+            {mode === "dispatch" &&
+              ["heading_to_delivery", "returning"].includes(b.status) && (
+                <p className="prototype-note">
+                  Use Demo courier to complete the handoff with required proof.
+                  Dispatch cannot bypass it.
+                </p>
+              )}
           </article>
         ))}
       </div>

@@ -1,6 +1,6 @@
 # CoreRunner Courier Project Blueprint
 
-CoreRunner Courier is a fictional Atlanta courier service being developed as a portfolio web application, with a structure that could support a future sale to a courier operator. This blueprint records the product decisions agreed during planning and defines the first implementation scope. A local React and Express implementation now supports persisted demo accounts, backend quotes and bookings, a dispatch board, status tracking, and simulated payment events in SQLite. Corey remains scripted. The implementation is a local demo, with the limits documented in README.md.
+CoreRunner Courier is a fictional Atlanta courier service being developed as a portfolio web application, with a structure that could support a future sale to a courier operator. This blueprint records the product decisions agreed during planning and defines the first implementation scope. A local React and Express implementation now supports persisted demo accounts, backend quotes and bookings, dispatch and courier workspaces, status tracking, signature/PIN/photo proof, sender authorization, and simulated payment events in SQLite. Corey remains scripted. The implementation is a local demo, with the limits documented in README.md.
 
 The product centers on personal and small-business deliveries. A polished React.js customer experience connects to a backend that owns bookings, prices, dispatch, tracking, permissions, and payment records. Corey the Courier is the AI booking and customer service agent, not the company name.
 
@@ -138,7 +138,7 @@ If nobody answers for an attended delivery, the courier may immediately record a
 
 If the sender authorizes and the courier can complete the drop-off, a photo is required. If the courier does not contact the sender, receives no response, or authorization is declined, same-day return to the sender is the default.
 
-Dispatch must plan for possible returns in courier schedules. A failed handoff activates the return leg, updates the schedule, and notifies the sender of the expected arrival. The package remains assigned to that courier until the return is documented. If the sender is unavailable or same-day return cannot be completed, dispatch handles an unresolved exception. Do not falsely mark a delivery or return complete. No holding-location workflow is included at this stage; exact return proof requirements remain open.
+Dispatch must plan for possible returns in courier schedules. A failed handoff activates the return leg, updates the schedule, and notifies the sender of the expected arrival. The package remains assigned to that courier until the return is documented. If the sender is unavailable or same-day return cannot be completed, dispatch handles an unresolved exception. Do not falsely mark a delivery or return complete. No holding-location workflow is included at this stage. The initial implementation records a receiving person’s name, drawn signature, and receipt consent for a return. Alternative return proof methods remain open.
 
 ## Courier roster and dispatch
 
@@ -179,7 +179,7 @@ Saved addresses, repeat booking, advanced reporting, and business account conven
 
 ## Proposed backend structure
 
-Use one modular backend initially, with clear boundaries for identity, quotes, bookings, readiness evidence, dispatch, tracking, handoff proof, payments, notifications, and support. The first local implementation uses Express and SQLite. Hosting, production database requirements, maps, and AI provider choices remain open. Avoid prematurely splitting this portfolio application into many services.
+Use one modular backend initially, with clear boundaries for identity, quotes, bookings, readiness evidence, dispatch, tracking, handoff proof, payments, notifications, and support. The first local implementation uses Express and SQLite. Vercel with a hosted database is the intended deployment direction. The hosted database provider, maps, and AI provider remain open; the current SQLite implementation remains local. Avoid prematurely splitting this portfolio application into many services.
 
 Core records should cover users and roles, addresses, recipients, packages, versioned quotes, bookings, readiness reviews, couriers, shifts, vehicles, assignments, delivery and return legs, location events, sender authorizations, proof records, payment transactions, notifications, support cases, and audit events.
 
@@ -189,7 +189,9 @@ Keep booking, assignment, readiness, and payment states separate so a payment fa
 
 Grocery readiness is an additional dispatch gate. A failed handoff follows:
 
-`heading_to_delivery → handoff_failed → return_scheduled → returning → returned`
+`heading_to_delivery → return_scheduled → returning → returned`
+
+Recording a failed handoff appends both the failed-attempt event and the return-scheduled event immediately. Sender authorization can still permit photo completion before the courier starts returning; it is closed once returning begins.
 
 Recorded sender authorization may allow `handoff_failed → delivered` when required photo proof is present and the courier proceeds. Unresolved cases enter `exception` with package custody preserved. Pre-pickup cancellation ends in `cancelled`; post-pickup cancellation initiates the return flow.
 
