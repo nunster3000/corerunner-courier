@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { addressSuggestions, deliveryOptions } from "./addresses.js";
-import { formatAddress, price } from "./domain.js";
+import { formatAddress, price, delivery } from "./domain.js";
 import { demoReply } from "./corey-demo.js";
+import { trackingView } from "./tracking.js";
 const address = "430 Pryor St. Atlanta, GA 30312";
 test("Atlanta address without a city comma is formatted and accepted for all service estimates", () => {
   assert.equal(formatAddress(address), "430 Pryor St., Atlanta, GA 30312");
@@ -21,12 +22,12 @@ test("Atlanta address without a city comma is formatted and accepted for all ser
     );
   assert.ok(options[1].price.total > options[0].price.total);
   assert.throws(
-    () => deliveryOptions({ ...input, pickup: "123 Main Street" }),
-    /Pickup address:/,
+    () => deliveryOptions({ ...input, pickup: "" }),
+    /Pickup address/,
   );
   assert.throws(
-    () => deliveryOptions({ ...input, dropoff: "123 Main Street" }),
-    /Delivery address:/,
+    () => deliveryOptions({ ...input, dropoff: "" }),
+    /Delivery address/,
   );
 });
 test("demo suggestions retain street and explicitly complete a city", () => {
@@ -34,35 +35,56 @@ test("demo suggestions retain street and explicitly complete a city", () => {
     addressSuggestions("430 Pryor St., Atl")[0].address,
     "430 Pryor St., Atlanta",
   );
-  assert.ok(
-    addressSuggestions("430 Pryor St.").every((s) =>
-      s.address.startsWith("430 Pryor St., "),
-    ),
+  assert.equal(
+    addressSuggestions("123 Main Street, Boston")[0].address,
+    "123 Main Street, Boston",
   );
-  assert.throws(() => formatAddress("123 Main Street, Boston"), /coverage/);
+  assert.equal(
+    addressSuggestions("123 Main Street")[0].address,
+    "123 Main Street",
+  );
 });
-test("Corey recovers missing-city drafts through a direct reply and preserves formatted address", () => {
-  const s = {
-    draft: { pickup: "123 Main Street", dropoff: address },
-    quote: { stale: true },
-  };
-  let r = demoReply(
-    s,
-    "quote",
-    { id: 1 },
-    () => {},
-    () => [],
-  );
-  assert.equal(r.pending, "pickup");
-  assert.equal(r.quote, null);
-  r = demoReply(
-    s,
-    address,
-    { id: 1 },
-    () => {},
-    () => [],
-  );
-  assert.equal(r.draft.pickup, formatAddress(address));
-  assert.equal(r.draft.dropoff, formatAddress(address));
-  assert.equal(r.pending, "recipient");
+test("any demo address survives Corey, quoting and tracking without city restrictions", () => {
+  for (const address of [
+    "27 Test Lane, Smyrna, ga 30080",
+    "84 Example Road, Dunwoody, GA 30338",
+    "19 Oak Avenue, Boston, MA 02108",
+    "Unit 4, 62 Demo Road",
+    "88 Fictional Lane 30312",
+    "91 Main Road, 東京",
+    "100 Sample Street, Marietta",
+  ]) {
+    const s = { draft: { pickup: address, dropoff: address } };
+    const r = demoReply(
+      s,
+      "quote",
+      { id: 1 },
+      () => {},
+      () => [],
+    );
+    assert.equal(r.pending, "recipient");
+    assert.equal(r.draft.pickup, formatAddress(address));
+    const options = deliveryOptions({ pickup: address, dropoff: address });
+    assert.equal(options.options.length, 3);
+    assert.ok(
+      options.options.every((o) => o.price.total > 0 && o.price.simulation),
+    );
+    const d = delivery({
+      pickup: address,
+      dropoff: address,
+      recipient: "Demo",
+      recipientEmail: "demo@example.com",
+      item: "Everyday package",
+      weight: 5,
+      service: "Same-day",
+    });
+    assert.equal(d.dropoff, formatAddress(address));
+    assert.doesNotThrow(() =>
+      trackingView({
+        delivery: d,
+        status: "heading_to_delivery",
+        price: options.options[0].price,
+      }),
+    );
+  }
 });

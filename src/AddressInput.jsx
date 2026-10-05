@@ -49,6 +49,7 @@ export default function AddressInput({
         <input
           id={id}
           name={name}
+          maxLength={300}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={!!visible}
@@ -111,7 +112,7 @@ export default function AddressInput({
         </ul>
       )}
       <small id={`${id}-hint`} className="muted">
-        Demo suggestions · choose the correct city. Street locations are not
+        Demo suggestions · any address is welcome. Street locations are not
         verified.
       </small>
     </div>

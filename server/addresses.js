@@ -4,7 +4,7 @@ import { demoZone, text, price, formatAddress } from "./domain.js";
 export function addressSuggestions(query) {
   const q =
     typeof query === "string"
-      ? query.trim().replace(/\s+/g, " ").slice(0, 200)
+      ? query.trim().replace(/\s+/g, " ").slice(0, 300)
       : "";
   const cities = operator.coverage.zones.map((z) => z[0]);
   const matching = cities.filter((city) =>
@@ -32,33 +32,29 @@ export function addressSuggestions(query) {
   const prefix = parts.length > 1 ? parts.at(-1).trim().toLowerCase() : "";
   const partial =
     prefix && cities.filter((city) => city.toLowerCase().startsWith(prefix));
-  const candidates = partial?.length ? partial : cities;
-  const street = partial?.length ? parts.slice(0, -1).join(",").trim() : q;
-  return candidates.map((city) => ({
+  const entered = {
+    label: formatAddress(q),
+    address: formatAddress(q),
+    detail: "Use this address · demo route, street not verified",
+  };
+  // Complete only a recognized city prefix. Never append a different city to a full address.
+  if (!partial?.length) return [entered];
+  const street = parts.slice(0, -1).join(",").trim();
+  return partial.map((city) => ({
     label: `${street}, ${city}`,
     address: `${street}, ${city}`,
     detail: `Choose ${city} · demo completion, not a verified address`,
   }));
 }
+
 export function deliveryOptions(input) {
   const pickup = text(input.pickup, "Pickup address"),
     dropoff = text(input.dropoff, "Delivery address");
-  for (const [label, address] of [
-    ["Pickup address", pickup],
-    ["Delivery address", dropoff],
-  ]) {
-    try {
-      demoZone(address);
-    } catch (error) {
-      error.message = `${label}: choose a city suggestion or include a supported city. ${error.message}`;
-      throw error;
-    }
-  }
   return {
     options: ["Same-day", "Expedited", "Scheduled"].map((service) => ({
       service,
       price: price({ pickup, dropoff, service }),
     })),
-    note: "Estimated demo prices. Scheduled availability is checked after you choose a date and window. Your final quote is confirmed before booking.",
+    note: "Estimated demo prices use sample routes for any address; real coverage is not checked. Scheduled availability is checked after you choose a date and window. Your final quote is confirmed before booking.",
   };
 }

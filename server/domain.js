@@ -56,18 +56,32 @@ export function demoZone(address, settings = operator) {
     );
   return z;
 }
+// An unmatched address uses a sample route; this never establishes real coverage.
+export function simulatedZone(address, settings = operator) {
+  try {
+    return demoZone(address, settings);
+  } catch {
+    return (
+      settings.coverage.zones.find(
+        (z) => z[0] === settings.coverage.primaryCity,
+      ) || settings.coverage.zones[0]
+    );
+  }
+}
 export function formatAddress(value, label = "Address") {
   const address = text(value, label)
     .normalize("NFKC")
     .replace(/\s+/g, " ")
     .replace(/\s*,\s*/g, ", ")
-    .trim();
+    .trim()
+    .replace(/\b([a-z]{2})(?=\s+\d{5}(?:-\d{4})?\b)/gi, (state) =>
+      state.toUpperCase(),
+    );
   let city;
   try {
     [city] = demoZone(address);
-  } catch (error) {
-    error.message = `${label}: ${error.message}`;
-    throw error;
+  } catch {
+    return address;
   }
   const index = address.toLowerCase().lastIndexOf(city.toLowerCase());
   const street = address.slice(0, index).replace(/[, ]+$/, "");
@@ -125,13 +139,11 @@ export function delivery(input) {
     )
       fail(400, "Choose a delivery window during operating hours.");
   }
-  demoZone(d.pickup);
-  demoZone(d.dropoff);
   return d;
 }
 export function price(d, settings = operator) {
-  const a = demoZone(d.pickup, settings),
-    b = demoZone(d.dropoff, settings);
+  const a = simulatedZone(d.pickup, settings),
+    b = simulatedZone(d.dropoff, settings);
   const miles = Math.max(
     3,
     Math.round(Math.hypot((a[1] - b[1]) * 69, (a[2] - b[2]) * 57) * 1.3),
@@ -153,6 +165,6 @@ export function price(d, settings = operator) {
     miles,
     minutes,
     simulation: true,
-    note: "Illustrative rates and city-center route fixtures, not a measured route or live availability.",
+    note: "Illustrative rates using sample city-center routes. Unmatched addresses use the primary-city fixture, not actual distance or coverage.",
   };
 }

@@ -77,7 +77,7 @@ export function demoReply(s, message, user, createQuote, listBookings) {
           answer = formatAddress(answer);
         } catch {
           return result(
-            `Please include the city in the ${field === "pickup" ? "pickup" : "delivery"} address, or choose a demo address suggestion below. You can reply with the corrected address directly.`,
+            `Please enter a nonempty ${field === "pickup" ? "pickup" : "delivery"} address of at most 300 characters. You can reply with the corrected address directly.`,
           );
         }
       }
@@ -127,7 +127,7 @@ export function demoReply(s, message, user, createQuote, listBookings) {
       s.pending = addressField;
       s.quote = null;
       return result(
-        `Let’s fix the ${addressField === "pickup" ? "pickup" : "delivery"} address: include the service-area city or choose a demo suggestion below. Reply with the corrected address directly.`,
+        `Let’s fix the ${addressField === "pickup" ? "pickup" : "delivery"} address: enter an address of at most 300 characters. Reply with the corrected address directly.`,
       );
     }
   }

@@ -1,4 +1,4 @@
-import { demoZone, fail, stamp } from "./domain.js";
+import { simulatedZone, fail, stamp } from "./domain.js";
 export const movingStatuses = [
   "heading_to_pickup",
   "heading_to_delivery",
@@ -97,10 +97,10 @@ export function trackingView(b) {
       from:
         phase === "pickup"
           ? "Demo starting point"
-          : demoZone(
+          : simulatedZone(
               phase === "return" ? b.delivery.dropoff : b.delivery.pickup,
             )[0],
-      to: demoZone(
+      to: simulatedZone(
         phase === "return" || phase === "pickup"
           ? b.delivery.pickup
           : b.delivery.dropoff,

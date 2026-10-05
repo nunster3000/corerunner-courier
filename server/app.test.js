@@ -99,7 +99,7 @@ test("identity challenge is browser-bound, single-use and session-backed", async
   await a("/logout", {});
   assert.equal((await a("/me")).status, 401);
 });
-test("backend rejects invalid package, unknown service area and past date; ignores client totals", async (t) => {
+test("backend rejects invalid package, empty address and past date; ignores client totals", async (t) => {
   const { client } = await fixture(t),
     c = client();
   await login(c);
@@ -107,7 +107,7 @@ test("backend rejects invalid package, unknown service area and past date; ignor
     { weight: 51 },
     { weight: 0 },
     { weight: "bad" },
-    { pickup: "900 Ocean Drive, Miami" },
+    { pickup: "" },
     { service: "Scheduled", date: "2000-01-01", window: "8–10 a.m." },
     { service: "Scheduled", date: "2027-02-30", window: "8–10 a.m." },
   ])

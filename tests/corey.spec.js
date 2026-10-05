@@ -171,7 +171,7 @@ test("scripted Corey completes booking with no AI transport or API key", async (
   ).toBeVisible();
 });
 
-test("Corey selects a formatted address suggestion and recovers an incomplete address", async ({
+test("Corey selects an arbitrary address suggestion and preserves it in the form", async ({
   page,
 }) => {
   await page.goto("/");
@@ -179,27 +179,34 @@ test("Corey selects a formatted address suggestion and recovers an incomplete ad
     .getByRole("button", { name: "Book with Corey", exact: true })
     .click();
   const reply = page.getByLabel("Reply to Corey", { exact: true });
-  await reply.fill("pickup: 430 Pryor St.");
-  await page.getByRole("button", { name: "Send reply" }).click();
-  await expect(
-    page.getByText("Please include the city in the pickup address", {
-      exact: false,
-    }),
-  ).toBeVisible();
-  await reply.fill("430 Pryor St. Atlanta, GA 30312");
+  for (const answer of [
+    "start",
+    "Demo Visitor",
+    `address-${crypto.randomUUID()}@example.com`,
+    "4045550123",
+  ]) {
+    await reply.fill(answer);
+    await page.getByRole("button", { name: "Send reply" }).click();
+    await expect(reply).toHaveValue("");
+    await expect(reply).toBeEnabled();
+  }
+  await reply.fill("27 Test Lane, Smyrna, ga 30080");
   await page
-    .getByRole("option", { name: /430 Pryor St., Atlanta, GA 30312/ })
+    .getByRole("option", { name: /27 Test Lane, Smyrna, GA 30080/ })
     .click();
   await expect(
-    page.getByText("pickup: 430 Pryor St., Atlanta, GA 30312", { exact: true }),
+    page.getByText("pickup: 27 Test Lane, Smyrna, GA 30080", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("What’s your full name?", { exact: true }),
+    page.getByText(
+      "What’s the delivery address? Include the city and ZIP code.",
+      { exact: true },
+    ),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Prefer a form? Continue there" })
     .click();
   await expect(
     page.getByLabel("Default pickup address", { exact: true }),
-  ).toHaveValue("430 Pryor St., Atlanta, GA 30312");
+  ).toHaveValue("27 Test Lane, Smyrna, GA 30080");
 });

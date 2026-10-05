@@ -1033,12 +1033,9 @@ function App() {
                             )}
                           </div>
                           <p className="info-note">
-                            <MapPin size={18} /> Demo coverage uses city names.
-                            Include a supported city in both addresses:{" "}
-                            {operator.coverage.zones
-                              .map((zone) => zone[0])
-                              .join(", ")}
-                            . Real geocoding is not connected.
+                            <MapPin size={18} /> Use any address to try the
+                            demo. Prices and tracking use sample routes; real
+                            addresses and service coverage are not verified.
                           </p>
                         </>
                       )}

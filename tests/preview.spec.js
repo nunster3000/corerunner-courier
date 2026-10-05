@@ -29,7 +29,7 @@ async function account(page) {
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page
     .getByLabel("Delivery address", { exact: true })
-    .fill("200 Example Lane, Decatur, GA 30030");
+    .fill("200 Example Lane, Sandy Springs, GA 30328");
   await page.getByLabel("Recipient’s name").fill("Jamie Sample");
   await page.getByLabel("Recipient’s email").fill("jamie@example.com");
   await page.getByRole("button", { name: "Continue", exact: true }).click();

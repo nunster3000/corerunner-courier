@@ -9,8 +9,8 @@ test("courier completes PIN and authorized photo handoffs, then a signed return"
     name: "Handoff Demo",
     email: `handoff-${crypto.randomUUID()}@example.com`,
     phone: "4045550123",
-    pickup: "100 Sample Street, Atlanta 30303",
-    dropoff: "200 Example Lane, Decatur 30030",
+    pickup: "100 Sample Street, Brookhaven, GA 30319",
+    dropoff: "200 Example Lane, Roswell, GA 30075",
     recipient: "Jamie Sample",
     recipientEmail: "jamie@example.com",
     item: "Everyday package",
@@ -97,13 +97,11 @@ test("courier completes PIN and authorized photo handoffs, then a signed return"
   const photo = readFileSync(
     new URL("./fixtures/delivery.png", import.meta.url),
   );
-  await page
-    .getByLabel("Delivery photo", { exact: true })
-    .setInputFiles({
-      name: "sample-delivery.png",
-      mimeType: "image/png",
-      buffer: photo,
-    });
+  await page.getByLabel("Delivery photo", { exact: true }).setInputFiles({
+    name: "sample-delivery.png",
+    mimeType: "image/png",
+    buffer: photo,
+  });
   await page
     .getByRole("checkbox", { name: /I confirm the package is at a suitable/ })
     .check();
