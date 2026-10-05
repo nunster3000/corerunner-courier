@@ -186,6 +186,20 @@ export default function CourierWorkspace({ onBack }) {
                   </div>
                 </div>
               </div>
+              {b.returnOnly && (
+                <p className="info-note">
+                  Return only: {b.returnReason}.{" "}
+                  {b.returnFeeOverride === 0
+                    ? "No return fee applies."
+                    : "The disclosed return fee applies at signed handoff."}
+                </p>
+              )}
+              {b.status === "exception_hold" && (
+                <p className="error">
+                  Return is on hold. Contact demo dispatch to confirm custody
+                  and arrange the return. This assignment remains reserved.
+                </p>
+              )}
               <TrackingRoute tracking={b.tracking} />
               {b.tracking?.moving && (
                 <div className="simulation-controls">
@@ -255,7 +269,7 @@ export default function CourierWorkspace({ onBack }) {
                     Return to the original pickup address
                     {b.returnDueDate ? ` by ${b.returnDueDate}` : ""}. No
                     waiting period is required.
-                    {b.status === "returning"
+                    {b.status === "returning" || b.returnOnly
                       ? " Delivery authorization is now closed."
                       : " You may optionally request sender authorization before leaving."}
                   </p>
@@ -265,16 +279,25 @@ export default function CourierWorkspace({ onBack }) {
                       outside the demo inbox.
                     </small>
                   )}
-                  {b.delivery.unattended && b.status !== "returning" && (
-                    <p className="authorization-success">
-                      <CheckCircle2 size={16} /> The sender authorized
-                      unattended delivery. Complete with a photo if a suitable
-                      drop-off is possible, or proceed with the return.
-                    </p>
-                  )}
+                  {!b.returnOnly &&
+                    b.delivery.unattended &&
+                    b.status !== "returning" && (
+                      <p className="authorization-success">
+                        <CheckCircle2 size={16} /> The sender authorized
+                        unattended delivery. Complete with a photo if a suitable
+                        drop-off is possible, or proceed with the return.
+                      </p>
+                    )}
                 </div>
               )}
-              {proof === b.id ? (
+              {proof === b.id &&
+              [
+                "heading_to_delivery",
+                "returning",
+                "return_scheduled",
+                "handoff_failed",
+              ].includes(b.status) &&
+              (!b.returnOnly || b.status === "returning") ? (
                 <ProofCapture
                   key={b.id + ":" + b.status + ":" + b.delivery.unattended}
                   booking={b}
@@ -308,7 +331,8 @@ export default function CourierWorkspace({ onBack }) {
                     (["return_scheduled", "handoff_failed"].includes(
                       b.status,
                     ) &&
-                      b.delivery.unattended)) && (
+                      b.delivery.unattended &&
+                      !b.returnOnly)) && (
                     <button
                       className="button"
                       disabled={busy}
@@ -338,6 +362,7 @@ export default function CourierWorkspace({ onBack }) {
                       </button>
                     )}
                   {["return_scheduled", "handoff_failed"].includes(b.status) &&
+                    !b.returnOnly &&
                     !b.delivery.unattended && (
                       <button
                         className="button secondary"

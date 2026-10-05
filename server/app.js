@@ -1,3 +1,4 @@
+import { installCancellations } from "./cancellations.js";
 import { syncSimulation, trackingView, changeSimulation } from "./tracking.js";
 import { installGroceries, requireCurrentReadiness } from "./groceries.js";
 import { installCorey } from "./corey.js";
@@ -197,6 +198,18 @@ export function createApp({
         "SELECT kind,amount,created FROM payments WHERE booking_id=? ORDER BY id",
       )
       .all(b.id),
+  });
+  installCancellations(app, {
+    db,
+    auth,
+    staff,
+    owned,
+    read,
+    save,
+    present,
+    event,
+    payment,
+    notify,
   });
   installGroceries(app, {
     db,
@@ -636,7 +649,10 @@ export function createApp({
   app.post("/api/courier/:id/contact-sender", courier, (req, res) => {
     const b = transaction(db, () => {
       const b = assigned(req);
-      if (!["handoff_failed", "return_scheduled"].includes(b.status))
+      if (
+        b.returnOnly ||
+        !["handoff_failed", "return_scheduled"].includes(b.status)
+      )
         fail(
           409,
           "Sender authorization is available only before a failed handoff return begins.",
@@ -662,6 +678,11 @@ export function createApp({
   app.post("/api/bookings/:id/unattended", auth, (req, res) => {
     const b = transaction(db, () => {
       const b = owned(req);
+      if (b.returnOnly)
+        fail(
+          409,
+          "This package is committed to return; unattended delivery is unavailable.",
+        );
       if (req.body.authorize !== true)
         fail(400, "Explicit sender authorization is required.");
       if (
@@ -732,10 +753,11 @@ export function createApp({
         return { booking: present(b), reused: true };
       }
       const canDeliver =
-        b.status === "heading_to_delivery" ||
-        (["return_scheduled", "handoff_failed"].includes(b.status) &&
-          b.delivery.unattended &&
-          method === "photo");
+        !b.returnOnly &&
+        (b.status === "heading_to_delivery" ||
+          (["return_scheduled", "handoff_failed"].includes(b.status) &&
+            b.delivery.unattended &&
+            method === "photo"));
       if (
         (leg === "delivery" && !canDeliver) ||
         (leg === "return" && b.status !== "returning")
@@ -794,7 +816,11 @@ export function createApp({
       if (leg === "return") {
         b.status = "returned";
         b.returnReceivedBy = payload.signer;
-        payment(b, "return_charge", b.price.returnTotal);
+        payment(
+          b,
+          b.returnFeeOverride === 0 ? "return_fee_waived" : "return_charge",
+          b.returnFeeOverride ?? b.price.returnTotal,
+        );
       } else {
         b.status = "delivered";
         b.deliveredAt = created;
@@ -807,7 +833,7 @@ export function createApp({
       notify(
         b,
         `CoreRunner ${b.id}: ${b.status}`,
-        `Handoff recorded with ${method === "pin" ? "a recipient PIN" : method === "photo" ? "a delivery photo" : "a recipient signature"}. ${leg === "return" ? "The disclosed return distance and time charge has been recorded." : ""}`,
+        `Handoff recorded with ${method === "pin" ? "a recipient PIN" : method === "photo" ? "a delivery photo" : "a recipient signature"}. ${leg === "return" ? (b.returnFeeOverride === 0 ? "The return fee was waived for a company-caused failure." : "The disclosed return distance and time charge has been recorded.") : ""}`,
       );
       return { booking: present(b), reused: false };
     });

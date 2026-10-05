@@ -51,7 +51,7 @@ There is no generic completion bypass in dispatch. Delivered and returned status
 | Staff-gated dispatch API, courier-scoped sessions, approved roster, one active job per courier | Demo role entry grants local access; no production staff authentication or shift planning |
 | PIN verification, captured signatures, normalized delivery photos and proof history | The app records evidence; it does not independently establish signer identity or confirm photo contents |
 | Sender-only unattended authorization, immediate return scheduling, signed returns | No outgoing contact is sent; after-hours exceptions and other failure causes remain unfinished |
-| Pickup capture, return charge, ledger and event history | No real money movement, card processing, cancellation, or refunds yet |
+| Pickup capture, return charge, ledger and event history | Cancellation previews, fee capture and authorization release are simulated; no real money movement or original-charge refunds |
 | Recipient tracking tokens, simulated route positions, automatic polling and stale-update labels | No phone GPS, geographic street maps or arrival estimates |
 | Grocery screenshot uploads, staff approval/rejection, resubmission and current-date assignment checks | Human review only; no OCR or store integration |
 | Customer-scoped notification history | Demo inbox includes sender and recipient copies; nothing is sent |
@@ -68,7 +68,7 @@ An optional server-only OpenAI Responses adapter is retained for a future owner.
 
 In live mode, chat data is sent to OpenAI with `store: false` (not a claim of zero provider retention). The integration retains server-owned quote validation and customer confirmation. Sessions expire after one hour and use an HttpOnly cookie. Limits include 2,000 characters per message, 40 turns per conversation, 20 turns per minute across the server, and four model calls per live turn. Tests use local scripted behavior and injected AI fixtures; they do not spend API credits.
 
-Grocery image analysis, actual support-case submission, cancellation and refund tools remain future work. Public deployment still requires the identity and hosting changes described above.
+Grocery image analysis, actual support-case submission, chat cancellation tools and original-charge refunds remain future work. Public deployment still requires the identity and hosting changes described above.
 
 ## Illustrative pricing and dispatch behavior
 
@@ -76,7 +76,15 @@ The demo adapter uses $5 pickup, $1.25 per fixture mile, $0.20 per fixture minut
 
 Demo city matching supports Atlanta, Decatur, Marietta, Alpharetta, Lawrenceville, and Peachtree City. Real polygons, geocoding, cutoff enforcement, capacity scheduling, vehicle constraints, dimensions, multiple packages, cold-item handling, and holiday hours remain open. Scheduled dates must not be in the past, but an offered window does not assert live availability. One active delivery per courier conservatively reserves return capacity; it is not optimized scheduling.
 
-The implemented return branch models recipient unavailability only. Other failure reasons, company-caused returns, after-hours exceptions, and unavailable senders require further work. A same-day due date is recorded in Atlanta time, but this is not an automated feasibility or scheduling guarantee. The initial return-proof implementation uses a captured signature; unattended returns and alternative return-PIN policies are not yet implemented.
+The return branch models recipient unavailability, sender cancellation after pickup, and staff-recorded company failures. Company failures can enter a custody/return hold with the courier assignment reserved. After-hours exceptions, reassignment, and unavailable senders still require further work. A same-day due date is recorded in Atlanta time, but this is not an automated feasibility or scheduling guarantee. The initial return-proof implementation uses a captured signature; unattended returns and alternative return-PIN policies are not yet implemented.
+
+## Cancellation and company exceptions
+
+My deliveries offers a backend cancellation preview and an explicit confirmation checkbox. Before pickup, cancellation releases the authorization in full unless the courier is heading to pickup at or within two simulated miles; then only the base pickup fee is captured and the balance released. The sample pickup route starts at five miles. Its remaining distance is a fixture derived from server-owned progress, not real driving distance. Paused, missing or stale tracking blocks fee calculation until refreshed or reviewed. No guessed charge is applied.
+
+Previews expire after two minutes and are bound to the booking state and tracking sequence. A changed state requires a fresh preview. Confirmation is transactional and retry-safe. Cancellation after pickup schedules a return on the same courier, retains the original charge and applies the disclosed return distance/time fee only at signed return. It closes unattended-delivery authorization and cannot be converted back into a delivery by a courier.
+
+Demo dispatch can record a CoreRunner-caused failure with a reason and explicit confirmation. Before pickup, it cancels without a fee and releases the full authorization. After pickup, the return fee is waived. If immediate return is not feasible, an exception hold preserves the courier assignment; staff must confirm custody and return capability to arrange recovery. All returns still require a signed handoff. Original captured charges are marked **refund review required**; this does not issue a refund or imply a settled refund policy. Reassignment, losses, damage claims, and original-charge refund decisions remain future work.
 
 ## Simulated tracking
 

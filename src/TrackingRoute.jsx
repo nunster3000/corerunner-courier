@@ -114,6 +114,12 @@ export default function TrackingRoute({ tracking: t }) {
             : "No active courier location is shared."}
         </p>
       )}
+      {t.phase === "pickup" && t.location && (
+        <p>
+          {t.pickupMilesRemaining} simulated miles to pickup · five-mile demo
+          route.
+        </p>
+      )}
       <p className="prototype-note">
         {t.updatedAt
           ? `Last simulated update: ${new Date(t.updatedAt).toLocaleTimeString()}. `

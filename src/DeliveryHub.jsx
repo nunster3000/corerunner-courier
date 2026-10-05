@@ -1,3 +1,4 @@
+import DeliveryExceptions from "./DeliveryExceptions";
 import TrackingRoute from "./TrackingRoute";
 import GroceryReadiness from "./GroceryReadiness";
 import React, { useEffect, useState, useRef } from "react";
@@ -328,6 +329,7 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
                 )}
             </div>
             {mode !== "dispatch" &&
+              !b.returnOnly &&
               [
                 "heading_to_delivery",
                 "return_scheduled",
@@ -376,6 +378,11 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
                   retains the package and reserved return capacity.
                 </p>
               )}
+            <DeliveryExceptions
+              booking={b}
+              dispatch={mode === "dispatch"}
+              onChange={load}
+            />
             <ProofHistory booking={b} />
             {mode === "dispatch" &&
               ["heading_to_delivery", "returning"].includes(b.status) && (

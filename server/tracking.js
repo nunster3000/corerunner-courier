@@ -76,6 +76,10 @@ export function trackingView(b) {
       : null;
   return {
     simulated: true,
+    pickupMilesRemaining:
+      phase === "pickup"
+        ? Math.round(5 * (1 - progress / 100) * 10) / 10
+        : null,
     phase,
     progress,
     sequence: s.sequence,

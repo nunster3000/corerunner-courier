@@ -24,7 +24,11 @@ export function demoReply(s, message, user, createQuote, listBookings) {
   });
   if (/^(help|policies|what can you do)\??$/i.test(value))
     return result(
-      "I’m a scripted demo guide. Say “start” to book, “status” for your deliveries, or “groceries”, “returns”, or “coverage” for service details. To correct a detail, use its field name and a colon, such as weight: 12 or service: Expedited.",
+      "I’m a scripted demo guide. Say “start” to book, “status” for your deliveries, or “groceries”, “returns”, “cancellation”, or “coverage” for service details. To correct a detail, use its field name and a colon, such as weight: 12 or service: Expedited.",
+    );
+  if (/^(cancel|cancellation|refunds?)\??$/i.test(value))
+    return result(
+      "Open My deliveries and choose Review cancellation to see the backend fee before confirming. Before pickup it is free unless the courier is heading to pickup within 2 simulated miles; then only the base fee applies. After pickup, cancellation schedules a return with the original charge retained and the disclosed return fee. Company-caused failures have no return fee. Refunds need staff review.",
     );
   if (/^groceries\??$/i.test(value))
     return result(

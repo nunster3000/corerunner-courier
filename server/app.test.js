@@ -1049,3 +1049,235 @@ test("simulated tracking is courier-scoped, sequenced, persisted and cannot comp
   assert.equal(r.tracking.progress, 0);
   assert.equal(JSON.stringify(r).includes(sample.pickup), false);
 });
+
+async function cancelPreview(c, b) {
+  return c(`/bookings/${b.id}/cancellation-quote`, {});
+}
+async function cancelConfirm(c, b, q, key = randomUUID()) {
+  return c(
+    `/bookings/${b.id}/cancel`,
+    { quoteId: q.id, accepted: true },
+    { "Idempotency-Key": key },
+  );
+}
+test("pre-pickup cancellation is scoped, explicit and releases authorization exactly once", async (t) => {
+  const { client, db } = await fixture(t);
+  const c = client(),
+    other = client();
+  await login(c);
+  await login(other, "other@example.com");
+  const b = await book(c);
+  assert.equal((await cancelPreview(other, b)).status, 404);
+  const q = (await cancelPreview(c, b)).body;
+  assert.equal(q.fee, 0);
+  assert.equal(
+    (
+      await c(
+        `/bookings/${b.id}/cancel`,
+        { quoteId: q.id },
+        { "Idempotency-Key": "cancel" },
+      )
+    ).status,
+    400,
+  );
+  const r = await cancelConfirm(c, b, q, "cancel");
+  assert.equal(r.body.booking.status, "cancelled");
+  assert.equal(r.body.booking.paymentStatus, "authorization_released");
+  assert.equal((await cancelConfirm(c, b, q, "cancel")).body.reused, true);
+  assert.equal(
+    db
+      .prepare(
+        "SELECT count(*) n FROM payments WHERE kind='authorization_release'",
+      )
+      .get().n,
+    1,
+  );
+  assert.equal(
+    db
+      .prepare("SELECT amount FROM payments WHERE kind='authorization_release'")
+      .get().amount,
+    b.price.total,
+  );
+  assert.equal((await c("/track/" + b.trackingToken)).body.location, null);
+});
+test("two-mile cancellation captures only base and rejects stale or changed location previews", async (t) => {
+  const { client, db } = await fixture(t);
+  const c = client();
+  await login(c);
+  await c("/demo/dispatch-session", {});
+  await c("/demo/courier-session", { courierId: "cr-01" });
+  const b = await book(c, { service: "Expedited" });
+  await c(`/dispatch/${b.id}/assign`, { courierId: "cr-01" });
+  await c(`/courier/${b.id}/advance`, { status: "heading_to_pickup" });
+  let q = (await cancelPreview(c, b)).body;
+  assert.equal(q.fee, 0);
+  let trip = (await c(`/bookings/${b.id}`)).body.booking.tracking;
+  for (let i = 0; i < 3; i++)
+    trip = (
+      await c(`/courier/${b.id}/simulation`, {
+        action: "advance",
+        sequence: trip.sequence,
+      })
+    ).body.tracking;
+  assert.equal(trip.pickupMilesRemaining, 2);
+  assert.equal((await cancelConfirm(c, b, q)).status, 409);
+  q = (await cancelPreview(c, b)).body;
+  assert.equal(q.fee, b.price.base);
+  assert.equal(q.released, b.price.total - b.price.base);
+  trip = (
+    await c(`/courier/${b.id}/simulation`, {
+      action: "pause",
+      sequence: trip.sequence,
+    })
+  ).body.tracking;
+  assert.equal((await cancelPreview(c, b)).status, 409);
+  assert.equal((await cancelConfirm(c, b, q)).status, 409);
+  await c(`/courier/${b.id}/simulation`, {
+    action: "resume",
+    sequence: trip.sequence,
+  });
+  q = (await cancelPreview(c, b)).body;
+  const r = await cancelConfirm(c, b, q);
+  assert.equal(r.body.booking.status, "cancelled");
+  assert.equal(
+    db
+      .prepare("SELECT amount FROM payments WHERE kind='cancellation_fee'")
+      .get().amount,
+    b.price.base,
+  );
+  const next = await book(c);
+  assert.equal(
+    (await c(`/dispatch/${next.id}/assign`, { courierId: "cr-01" })).status,
+    200,
+  );
+});
+test("after-pickup cancellation preserves custody and charges only after signed return", async (t) => {
+  const { sender, courier, b, db } = await prepared(t, { unattended: true });
+  const q = (await cancelPreview(sender, b)).body;
+  assert.equal(q.action, "return");
+  assert.equal(q.fee, b.price.returnTotal);
+  const r = await cancelConfirm(sender, b, q);
+  assert.equal(r.body.booking.status, "return_scheduled");
+  assert.equal(r.body.booking.returnOnly, true);
+  assert.equal(
+    db
+      .prepare("SELECT count(*) n FROM payments WHERE kind='return_charge'")
+      .get().n,
+    0,
+  );
+  assert.equal(
+    (await sender(`/bookings/${b.id}/unattended`, { authorize: true })).status,
+    409,
+  );
+  assert.equal(
+    (
+      await courier(
+        `/courier/${b.id}/complete`,
+        {
+          leg: "delivery",
+          method: "photo",
+          photo: await image(),
+          safeLocation: true,
+        },
+        { "Idempotency-Key": "wrong-after-cancel" },
+      )
+    ).status,
+    409,
+  );
+  await courier(`/courier/${b.id}/advance`, { status: "returning" });
+  const body = { leg: "return", method: "signature", ...signature },
+    headers = { "Idempotency-Key": "signed-cancel-return" };
+  assert.equal(
+    (await courier(`/courier/${b.id}/complete`, body, headers)).body.booking
+      .status,
+    "returned",
+  );
+  await courier(`/courier/${b.id}/complete`, body, headers);
+  assert.equal(
+    db.prepare("SELECT amount FROM payments WHERE kind='return_charge'").get()
+      .amount,
+    b.price.returnTotal,
+  );
+});
+test("company failure cancels before pickup without fee and requires staff confirmation", async (t) => {
+  const { client, db } = await fixture(t);
+  const c = client();
+  await login(c);
+  const b = await book(c);
+  const path = `/dispatch/${b.id}/company-failure`,
+    body = { reason: "Vehicle unavailable", confirmed: true },
+    headers = { "Idempotency-Key": "company-cancel" };
+  assert.equal((await c(path, body, headers)).status, 403);
+  await c("/demo/dispatch-session", {});
+  assert.equal(
+    (await c(path, { ...body, confirmed: false }, headers)).status,
+    400,
+  );
+  const r = await c(path, body, headers);
+  assert.equal(r.body.booking.status, "cancelled");
+  assert.equal((await c(path, body, headers)).body.reused, true);
+  assert.equal(
+    db
+      .prepare("SELECT amount FROM payments WHERE kind='authorization_release'")
+      .get().amount,
+    b.price.total,
+  );
+  assert.equal(
+    db
+      .prepare("SELECT count(*) n FROM payments WHERE kind='cancellation_fee'")
+      .get().n,
+    0,
+  );
+});
+test("company failure holds assignment until recovery and waives return fee without inventing a refund", async (t) => {
+  const { sender, courier, b, db } = await prepared(t);
+  const path = `/dispatch/${b.id}/company-failure`;
+  const r = await sender(
+    path,
+    { reason: "Vehicle issue after pickup", confirmed: true, canReturn: false },
+    { "Idempotency-Key": "hold" },
+  );
+  assert.equal(r.body.booking.status, "exception_hold");
+  assert.equal(r.body.booking.exception.refundStatus, "review_required");
+  const next = await book(sender);
+  assert.equal(
+    (await sender(`/dispatch/${next.id}/assign`, { courierId: "cr-01" }))
+      .status,
+    409,
+  );
+  assert.equal(
+    (await sender(`/dispatch/${b.id}/resolve-return`, { canReturn: true }))
+      .status,
+    400,
+  );
+  assert.equal(
+    (
+      await sender(`/dispatch/${b.id}/resolve-return`, {
+        canReturn: true,
+        packageWithCourier: true,
+      })
+    ).body.booking.status,
+    "return_scheduled",
+  );
+  await courier(`/courier/${b.id}/advance`, { status: "returning" });
+  const done = await courier(
+    `/courier/${b.id}/complete`,
+    { leg: "return", method: "signature", ...signature },
+    { "Idempotency-Key": "no-fee-return" },
+  );
+  assert.equal(done.body.booking.status, "returned");
+  assert.equal(
+    db
+      .prepare("SELECT amount FROM payments WHERE kind='return_fee_waived'")
+      .get().amount,
+    0,
+  );
+  assert.equal(
+    db
+      .prepare(
+        "SELECT count(*) n FROM payments WHERE kind IN ('return_charge','refund')",
+      )
+      .get().n,
+    0,
+  );
+});
