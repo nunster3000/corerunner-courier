@@ -4,7 +4,7 @@ A local full-stack portfolio application for a fictional Atlanta courier service
 
 ## Vercel portfolio deployment
 
-A public hosted-demo entrypoint and visitor-isolated storage adapter are now prepared. The frontend and API run in one Vercel project, with Neon connected through Vercel Marketplace. Visitors enter without a password and receive separate temporary workspaces. See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration, limits, the demo snapshot architecture and required live verification. Vercel deployment and hosted schema initialization have been verified. Registered accounts use persistent Neon account records with scrypt password hashes and seven-day server sessions. They are separate from expiring guest workspaces. Email verification is simulated through a post-signup demo inbox. Real email delivery/recovery and a shared operator admin console remain unfinished.
+A public hosted-demo entrypoint and visitor-isolated storage adapter are now prepared. The frontend and API run in one Vercel project, with Neon connected through Vercel Marketplace. Visitors enter without a password and receive separate temporary workspaces. See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration, limits, the demo snapshot architecture and required live verification. Vercel deployment and hosted schema initialization have been verified. Registered accounts use persistent Neon account records with scrypt password hashes. Accounts expire 48 hours after creation; login does not extend that deadline. They are separate from expiring guest workspaces. Email verification is simulated through a post-signup demo inbox. Real email delivery/recovery and a shared operator admin console remain unfinished.
 
 ## Operator handoff direction
 
@@ -66,7 +66,7 @@ Browser tests use installed Google Chrome on macOS when available, otherwise Pla
 
 ## Try the complete implemented flow
 
-1. Choose Book a delivery to create a saved account with an 8–128 character password containing an uppercase letter, a number, and a special character, or use Log in for a returning account. Account creation saves data immediately as unverified. Open the demo inbox and simulate verification before booking. Use sample details; actual email ownership and recovery are not connected. Passwords never go through Corey.
+1. Choose Book a delivery to create a saved account with an 8–128 character password containing an uppercase letter, a number, and a special character, or use Log in for a returning account. Account creation saves data immediately as unverified for a 48-hour demo lifetime. Open the demo inbox and simulate verification before booking. Use sample details; actual email ownership and recovery are not connected. Passwords never go through Corey.
 2. Enter a destination and recipient email. For this version, one package and one destination are supported. Pick a weight up to 50 pounds, handoff preference, and service.
 3. Review the server-generated demo quote, original total, and possible return fee. Accept the quote and policy, then confirm the demo booking. You can also simulate a declined authorization; no booking or payment event is created on decline.
 4. Open My deliveries to see your saved booking and simulated email inbox. Refresh the browser; the session and records remain available.
@@ -189,3 +189,9 @@ The prepared portfolio destination is Vercel with Neon-backed, bounded demo snap
 ## Persistent account checks
 
 Run `npm run test:server` and `npx playwright test --config=playwright.accounts.config.js`. The latter runs an isolated password-account store on ports 5176/3006. Tests cover hashed passwords, duplicate-email protection, server restarts, saved bookings, separate-browser login, ownership checks and mobile form layout. Regular `npm test` retains the isolated guest-flow suite.
+
+## Demo data retention
+
+Registered accounts expire 48 hours after creation. Profiles, password hashes, verification data and their delivery snapshots are deleted together, with account sessions removed too. Login and email verification do not reset the deadline. The API purges expired accounts on requests; a daily Vercel Cron invokes `/api/maintenance/cleanup` at approximately 06:00 UTC even without visitors. Access ends at 48 hours; physical deletion waits until the next API request or daily sweep. Vercel Hobby does not support a more frequent schedule. Database-provider backups/PITR follow provider retention rather than this application policy.
+
+Existing Neon accounts retain their original creation time for this policy. Older local SQLite accounts lack a creation timestamp and receive 48 hours from their first migration. Deleted accounts can be recreated with the same email as new empty accounts.

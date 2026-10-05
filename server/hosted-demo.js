@@ -64,6 +64,20 @@ export function createHostedDemo({
       return res.status(415).json({ error: "Use application/json." });
     next();
   });
+  app.use(async (req, res, next) => {
+    try {
+      if (store.cleanupAccounts) await store.cleanupAccounts(now());
+      next();
+    } catch {
+      res
+        .status(503)
+        .json({
+          error: "Account storage is temporarily unavailable. Please retry.",
+        });
+    }
+  });
+  // Safe to trigger publicly: no input, only expired records, no account data returned.
+  app.get("/api/maintenance/cleanup", (req, res) => res.json({ ok: true }));
   app.get("/api/health", (req, res) =>
     res.json({ ok: true, mode: "public-portfolio-demo" }),
   );
@@ -90,7 +104,10 @@ export function createHostedDemo({
     if (accountCookie(req) && !account && req.path !== "/api/operator")
       return res
         .status(401)
-        .json({ error: "Your login expired. Please log in again." });
+        .json({
+          error:
+            "Your session or 48-hour demo account expired. Log in, or create a new demo account.",
+        });
     if (
       account &&
       (req.path.startsWith("/api/auth/") || req.path.startsWith("/api/demo/"))
@@ -104,13 +121,10 @@ export function createHostedDemo({
       !account.email_verified &&
       !["/api/me", "/api/operator"].includes(req.path)
     )
-      return res
-        .status(403)
-        .json({
-          code: "EMAIL_VERIFICATION_REQUIRED",
-          error:
-            "Open your demo inbox and verify your email before continuing.",
-        });
+      return res.status(403).json({
+        code: "EMAIL_VERIFICATION_REQUIRED",
+        error: "Open your demo inbox and verify your email before continuing.",
+      });
     let token = cookies(req).cr_demo_workspace;
     let id = /^[a-f0-9]{64}$/.test(token || "") ? hash(token) : null;
     let row = account || (id ? await store.read(id) : null);
@@ -175,6 +189,7 @@ export function createHostedDemo({
             role: account.role,
             persistent: true,
             emailVerified: !!account.email_verified,
+            expiresAt: account.expires_at,
           }),
           account.id,
         );

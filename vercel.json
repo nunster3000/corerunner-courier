@@ -9,5 +9,16 @@
       "includeFiles": "config/operator.json"
     }
   },
-  "rewrites": [{ "source": "/api/:path*", "destination": "/api" }]
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/maintenance/cleanup",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }

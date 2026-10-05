@@ -521,15 +521,16 @@ function App() {
       </a>
       {operator.hostedDemo && (
         <aside className="hosted-notice">
-          Use sample data only. Registered accounts and deliveries are saved.
-          Guest demos expire. No real emails, payments or AI requests.
+          Use sample data only. Registered demo accounts expire after 48 hours
+          and are deleted during automatic cleanup. Guest demos last 2 hours. No
+          real emails, payments or AI requests.
         </aside>
       )}
       <div className="preview-strip">
         PORTFOLIO PREVIEW <span>Meet your next everyday delivery.</span>
         <span className="preview-right">
           {operator.hostedDemo
-            ? "Saved accounts · 2-hour guest demos"
+            ? "48-hour accounts · 2-hour guest demos"
             : "Local demo · no real deliveries or payments"}
         </span>
       </div>

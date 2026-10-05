@@ -61,7 +61,7 @@ export default function AccountAccess({
       <h2>{register ? "Create your account" : "Welcome back"}</h2>
       <p className="muted">
         {register
-          ? "Your account and delivery history stay saved when you leave."
+          ? "Your demo account and delivery history remain available for 48 hours after signup."
           : "Log in to access your saved account and deliveries."}
       </p>
       <form onSubmit={submit}>
@@ -195,7 +195,8 @@ export default function AccountAccess({
           : "New here? Create an account"}
       </button>
       <p className="muted">
-        After signup, verify your email in the demo inbox. No real email is
+        After signup, verify your email in the demo inbox. Accounts expire after
+        48 hours and are deleted during automatic cleanup. No real email is
         sent; mailbox ownership and password recovery are not connected.
       </p>
     </section>

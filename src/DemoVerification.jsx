@@ -38,6 +38,13 @@ export default function DemoVerification({ user, onVerified, onSignOut }) {
       <p>
         <strong>{user.email}</strong>
       </p>
+      {user.expiresAt && (
+        <p className="muted">
+          This demo account expires on{" "}
+          {new Date(user.expiresAt).toLocaleString()}. Its data is then deleted
+          during automatic cleanup.
+        </p>
+      )}
       <p className="muted">
         This is a simulated inbox. No real email is sent, and this does not
         confirm ownership of an actual mailbox.

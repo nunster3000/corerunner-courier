@@ -7,24 +7,32 @@ export function hostedStore(url) {
     async findAccount(email) {
       return (
         (
-          await sql`SELECT id,email,password,profile,role,email_verified FROM corerunner_accounts WHERE email=${email}`
+          await sql`SELECT id,email,password,profile,role,email_verified,expires_at FROM corerunner_accounts WHERE email=${email} AND expires_at > now()`
         )[0] || null
       );
     },
+    async cleanupAccounts() {
+      await sql.transaction([
+        sql`DELETE FROM corerunner_accounts WHERE expires_at <= now()`,
+        sql`DELETE FROM corerunner_account_sessions WHERE expires <= now()`,
+        sql`DELETE FROM corerunner_demo_workspaces WHERE expires <= now()`,
+        sql`DELETE FROM corerunner_demo_limits WHERE expires <= now()`,
+      ]);
+    },
     async setVerification(id, verification) {
-      await sql`UPDATE corerunner_accounts SET verification=${JSON.stringify(verification)}::jsonb WHERE id=${id} AND email_verified=false`;
+      await sql`UPDATE corerunner_accounts SET verification=${JSON.stringify(verification)}::jsonb WHERE id=${id} AND expires_at > now() AND email_verified=false`;
     },
     async verifyAccount(id, session, token, now) {
       return (
         (
-          await sql`UPDATE corerunner_accounts SET email_verified=true,verification=NULL WHERE id=${id} AND email_verified=false AND verification->>'session'=${session} AND verification->>'token'=${token} AND (verification->>'expires')::bigint>${now} RETURNING id`
+          await sql`UPDATE corerunner_accounts SET email_verified=true,verification=NULL WHERE id=${id} AND expires_at > now() AND email_verified=false AND verification->>'session'=${session} AND verification->>'token'=${token} AND (verification->>'expires')::bigint>${now} RETURNING id`
         ).length === 1
       );
     },
     async createAccount(a) {
       return (
         (
-          await sql`INSERT INTO corerunner_accounts (id,email,password,profile,role,snapshot) VALUES (${a.id},${a.email},${a.password},${JSON.stringify(a.profile)}::jsonb,'customer',${JSON.stringify(a.snapshot)}::jsonb) ON CONFLICT(email) DO NOTHING RETURNING id`
+          await sql`INSERT INTO corerunner_accounts (id,email,password,profile,role,snapshot,created_at,expires_at) VALUES (${a.id},${a.email},${a.password},${JSON.stringify(a.profile)}::jsonb,'customer',${JSON.stringify(a.snapshot)}::jsonb,${a.created_at},${a.expires_at}) ON CONFLICT(email) DO NOTHING RETURNING id`
         ).length === 1
       );
     },
@@ -38,14 +46,14 @@ export function hostedStore(url) {
     async readAccountSession(token) {
       return (
         (
-          await sql`SELECT a.id,a.email,a.profile,a.role,a.snapshot,a.revision,a.email_verified,a.verification FROM corerunner_accounts a JOIN corerunner_account_sessions s ON s.account_id=a.id WHERE s.token=${token} AND s.expires > now()`
+          await sql`SELECT a.id,a.email,a.profile,a.role,a.snapshot,a.revision,a.email_verified,a.verification,a.expires_at FROM corerunner_accounts a JOIN corerunner_account_sessions s ON s.account_id=a.id WHERE s.token=${token} AND s.expires > now() AND a.expires_at > now()`
         )[0] || null
       );
     },
     async saveAccount(id, revision, snapshot) {
       return (
         (
-          await sql`UPDATE corerunner_accounts SET snapshot=${JSON.stringify(snapshot)}::jsonb,revision=revision+1 WHERE id=${id} AND revision=${revision} RETURNING id`
+          await sql`UPDATE corerunner_accounts SET snapshot=${JSON.stringify(snapshot)}::jsonb,revision=revision+1 WHERE id=${id} AND revision=${revision} AND expires_at > now() RETURNING id`
         ).length === 1
       );
     },

@@ -67,7 +67,7 @@ A successful Vercel build does not confirm that the API has its environment sett
 
 ## Registered accounts
 
-`corerunner_accounts` stores persistent profiles, scrypt hashes, a server-owned role (customer on public signup), and account-owned booking snapshots with optimistic concurrency. Guest cleanup never deletes accounts. `corerunner_account_sessions` stores hashed random tokens with seven-day expiry. Login rate limits are stored in Neon. No new environment variables are needed; schema creation is additive on startup. Passwords are never included in chats or snapshots. Duplicate-email registration cannot overwrite an existing account.
+`corerunner_accounts` stores persistent profiles, scrypt hashes, a server-owned role (customer on public signup), and account-owned booking snapshots with optimistic concurrency. The account retention sweep deletes accounts after their 48-hour lifetime, independently of two-hour guest workspace cleanup. `corerunner_account_sessions` stores hashed random tokens capped at the account’s 48-hour deadline. Login rate limits are stored in Neon. No new environment variables are needed; schema creation is additive on startup. Passwords are never included in chats or snapshots. Duplicate-email registration cannot overwrite an existing account.
 
 Customer sessions cannot enter guest staff/courier roles or passwordless guest identities. Sign out to use the separate public guided demo. A shared admin dashboard and staff provisioning across persistent accounts are not implemented yet. Registered account snapshots are bounded to 8 MiB; use sample data. The homepage remains public.
 
@@ -78,3 +78,9 @@ Email ownership verification, password recovery, account deletion UI, shared rec
 Persistent accounts default to `email_verified=false`, including accounts created before the inbox was restored. They can log in, request a demo email, read their session-bound inbox, verify, or sign out; protected booking and dashboard APIs return `EMAIL_VERIFICATION_REQUIRED` until completion. Signup data stays saved if verification is interrupted. No existing account or booking is deleted by this migration.
 
 The inbox is explicitly simulated and requires the authenticated account session. Challenges expire after ten minutes, are replaced on resend, and are consumed atomically when verified. Neon retains only the challenge hash, session hash, nonce and expiry; the displayed token is derived server-side. Verification status persists across browsers and future logins. This demonstrates the workflow and does not prove actual mailbox ownership.
+
+## Automatic account deletion
+
+`expires_at` is fixed at `created_at + 48 hours` for Neon accounts, including previously created accounts. It is indexed and enforced by account/session lookups as well as cleanup. Account rows contain profile, credentials, verification and booking data; deleting the row also cascades to its sessions. Cleanup also removes expired guest workspaces and rate-limit rows. There is no restore feature in the app.
+
+`vercel.json` schedules `/api/maintenance/cleanup` daily at 06:00 UTC, compatible with Hobby. The endpoint takes no deletion criteria, returns no personal data, and only runs the same expired-record sweep that API requests already run. No new secret is required. Account access ends at 48 hours; on an idle site, database deletion waits for the next scheduled daily run. This is not a guarantee of deletion at exactly hour 48, and does not control Neon backups/PITR. Verify the cron is registered in the Vercel dashboard after deployment.

@@ -221,3 +221,43 @@ test("verification is session-bound, expiring, single-use and cannot be bypassed
     await f.close();
   }
 });
+
+test("48-hour retention deletes expired account data and sessions without extending on login", async () => {
+  let now = Date.now();
+  const f = await fixture(":memory:", { now: () => now });
+  try {
+    const a = f.browser(),
+      b = f.browser();
+    const created = await a.call("/auth/register", profile);
+    const originalId = created.body.user.id;
+    const expires = Date.parse(created.body.user.expiresAt);
+    assert.equal(expires, now + 48 * 60 * 60 * 1000);
+    await verify(a);
+    const oldToken = a.jar.get("cr_account");
+    const tokenHash = (await import("./accounts.js")).accountTokenHash;
+    now += 24 * 60 * 60 * 1000;
+    const second = await b.call("/auth/register", {
+      ...profile,
+      email: "still-active@example.com",
+    });
+    now = expires - 1;
+    assert.equal((await a.call("/me")).status, 200);
+    const relogin = await a.call("/auth/login", profile);
+    assert.equal(relogin.body.user.expiresAt, created.body.user.expiresAt);
+    now = expires;
+    assert.equal((await a.call("/maintenance/cleanup")).status, 200);
+    assert.equal(await f.store.findAccount(profile.email), null);
+    assert.equal(await f.store.readAccountSession(tokenHash(oldToken)), null);
+    assert.equal((await a.call("/me")).status, 401);
+    assert.equal((await a.call("/auth/login", profile)).status, 401);
+    assert.equal((await b.call("/me")).body.user.id, second.body.user.id);
+    const replacement = await a.call("/auth/register", profile);
+    assert.equal(replacement.status, 200);
+    assert.notEqual(replacement.body.user.id, originalId);
+    await verify(a);
+    assert.deepEqual((await a.call("/bookings")).body.bookings, []);
+    assert.equal((await a.call("/maintenance/cleanup")).status, 200);
+  } finally {
+    await f.close();
+  }
+});

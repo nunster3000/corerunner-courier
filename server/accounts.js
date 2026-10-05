@@ -1,3 +1,4 @@
+import { ACCOUNT_TTL_MS, accountExpiry } from "./account-retention.js";
 import { randomBytes, randomUUID, createHash, createHmac } from "node:crypto";
 import { profile, email, Problem } from "./domain.js";
 import { passwordHash, passwordMatches } from "./passwords.js";
@@ -19,6 +20,7 @@ export const accountUser = (account) => ({
   role: account.role,
   persistent: true,
   emailVerified: !!account.email_verified,
+  expiresAt: account.expires_at,
 });
 export function installAccounts(app, store, { secure, now, secret }) {
   if (!store.findAccount) return;
@@ -27,7 +29,7 @@ export function installAccounts(app, store, { secure, now, secret }) {
     httpOnly: true,
     sameSite: "strict",
     secure,
-    maxAge: 7 * 86400000,
+    maxAge: ACCOUNT_TTL_MS,
   };
   const route = (fn) => async (req, res) => {
     try {
@@ -57,12 +59,16 @@ export function installAccounts(app, store, { secure, now, secret }) {
   }
   async function signIn(res, account) {
     const token = randomBytes(32).toString("hex");
+    const expires = Math.min(now() + ACCOUNT_TTL_MS, accountExpiry(account));
     await store.createAccountSession(
       accountTokenHash(token),
       account.id,
-      now() + cookie.maxAge,
+      expires,
     );
-    res.cookie("cr_account", token, cookie);
+    res.cookie("cr_account", token, {
+      ...cookie,
+      maxAge: Math.max(0, expires - now()),
+    });
     for (const name of [
       "cr_session",
       "cr_staff",
@@ -87,6 +93,8 @@ export function installAccounts(app, store, { secure, now, secret }) {
         profile: p,
         role: "customer",
         password,
+        created_at: new Date(now()).toISOString(),
+        expires_at: new Date(now() + ACCOUNT_TTL_MS).toISOString(),
       };
       const { db } = createApp({ dbPath: ":memory:" });
       try {

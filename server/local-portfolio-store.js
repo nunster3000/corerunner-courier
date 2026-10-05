@@ -1,3 +1,4 @@
+import { ACCOUNT_TTL_MS } from "./account-retention.js";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -19,6 +20,12 @@ export function localPortfolioStore(path) {
     );
   if (!columns.includes("verification"))
     db.exec("ALTER TABLE accounts ADD COLUMN verification TEXT");
+  if (!columns.includes("expires_at")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN expires_at TEXT");
+    db.prepare("UPDATE accounts SET expires_at=? WHERE expires_at IS NULL").run(
+      new Date(Date.now() + ACCOUNT_TTL_MS).toISOString(),
+    );
+  }
   const decode = (row) =>
     row
       ? {
@@ -63,13 +70,28 @@ export function localPortfolioStore(path) {
         db.prepare("SELECT count FROM limits WHERE id=?").get(id).count <= max
       );
     },
+    async cleanupAccounts(now = Date.now()) {
+      db.exec("BEGIN");
+      try {
+        const stamp = new Date(now).toISOString();
+        db.prepare(
+          "DELETE FROM account_sessions WHERE account_id IN (SELECT id FROM accounts WHERE expires_at<=?) OR expires<=?",
+        ).run(stamp, now);
+        db.prepare("DELETE FROM accounts WHERE expires_at<=?").run(stamp);
+        db.prepare("DELETE FROM workspaces WHERE expires<=?").run(now);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     async findAccount(email) {
       return decode(
         db
           .prepare(
-            "SELECT id,email,password,profile,role,email_verified FROM accounts WHERE email=?",
+            "SELECT id,email,password,profile,role,email_verified,expires_at FROM accounts WHERE email=? AND expires_at>?",
           )
-          .get(email),
+          .get(email, new Date().toISOString()),
       );
     },
     async setVerification(id, verification) {
@@ -90,7 +112,7 @@ export function localPortfolioStore(path) {
       return (
         db
           .prepare(
-            "INSERT INTO accounts(id,email,password,profile,role,snapshot) VALUES(?,?,?,?,'customer',?) ON CONFLICT(email) DO NOTHING",
+            "INSERT INTO accounts(id,email,password,profile,role,snapshot,expires_at) VALUES(?,?,?,?,'customer',?,?) ON CONFLICT(email) DO NOTHING",
           )
           .run(
             a.id,
@@ -98,6 +120,7 @@ export function localPortfolioStore(path) {
             a.password,
             JSON.stringify(a.profile),
             JSON.stringify(a.snapshot),
+            a.expires_at,
           ).changes === 1
       );
     },
@@ -115,9 +138,9 @@ export function localPortfolioStore(path) {
       return decode(
         db
           .prepare(
-            "SELECT a.* FROM accounts a JOIN account_sessions s ON s.account_id=a.id WHERE s.token=? AND s.expires>?",
+            "SELECT a.* FROM accounts a JOIN account_sessions s ON s.account_id=a.id WHERE s.token=? AND s.expires>? AND a.expires_at>?",
           )
-          .get(token, Date.now()),
+          .get(token, Date.now(), new Date().toISOString()),
       );
     },
     async saveAccount(id, revision, snapshot) {
