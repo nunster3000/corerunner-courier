@@ -51,6 +51,7 @@ export function createApp({
   allowedOrigins = null,
   secureCookies = false,
   hostedDemo = false,
+  persistentAccounts = false,
   chatState = { sessions: new Map(), requestTimes: [] },
 } = {}) {
   const app = express(),
@@ -101,7 +102,9 @@ export function createApp({
       return res.status(400).json({ error: "Provide a JSON object." });
     next();
   });
-  app.get("/api/operator", (req, res) => res.json({ ...operator, hostedDemo }));
+  app.get("/api/operator", (req, res) =>
+    res.json({ ...operator, hostedDemo, persistentAccounts }),
+  );
   app.get("/api/addresses/suggest", (req, res) =>
     res.json({ suggestions: addressSuggestions(req.query.q) }),
   );

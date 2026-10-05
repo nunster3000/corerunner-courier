@@ -1,3 +1,4 @@
+import AccountAccess from "./AccountAccess.jsx";
 import AddressInput from "./AddressInput.jsx";
 import { useServicePrices } from "./ServicePrices.jsx";
 import { operator, loadOperator } from "./operator";
@@ -247,6 +248,7 @@ function App() {
     [busy, setBusy] = useState(false),
     [accepted, setAccepted] = useState(false),
     [paymentOutcome, setPaymentOutcome] = useState("approve");
+  const [accountMode, setAccountMode] = useState("login");
   const [activeDemo, setActiveDemo] = useState(null);
   const servicePrices = useServicePrices(data.pickup, data.dropoff, step === 3);
   const navigateDemo = (destination) => {
@@ -284,6 +286,8 @@ function App() {
   };
   const start = (service) => {
     if (service) update("service", service);
+    if (operator.persistentAccounts && !user) setAccountMode("register");
+    if (user && step === 0) setStep(1);
     setPage("booking");
     setDone(false);
     if (done) {
@@ -395,7 +399,11 @@ function App() {
   }
   async function signOut() {
     try {
-      await api("/logout", { method: "POST", body: {} });
+      await api(operator.persistentAccounts ? "/auth/signout" : "/logout", {
+        method: "POST",
+        body: {},
+      });
+      if (operator.persistentAccounts) await api("/operator");
       setUser(null);
       setActiveDemo(null);
       setVerified(false);
@@ -512,16 +520,15 @@ function App() {
       </a>
       {operator.hostedDemo && (
         <aside className="hosted-notice">
-          Use sample data only. Your temporary workspace is separate from other
-          visitors. No real emails, payments or AI requests. Tracking links stay
-          within this browser.
+          Use sample data only. Registered accounts and deliveries are saved.
+          Guest demos expire. No real emails, payments or AI requests.
         </aside>
       )}
       <div className="preview-strip">
         PORTFOLIO PREVIEW <span>Meet your next everyday delivery.</span>
         <span className="preview-right">
           {operator.hostedDemo
-            ? "Public demo · workspace lasts 2 hours"
+            ? "Saved accounts · 2-hour guest demos"
             : "Local demo · no real deliveries or payments"}
         </span>
       </div>
@@ -571,12 +578,21 @@ function App() {
                   setPage("deliveries");
                   setMenu(false);
                 } else {
-                  start();
-                  setStep(0);
+                  if (operator.persistentAccounts) {
+                    setAccountMode("login");
+                    setPage("account");
+                  } else {
+                    start();
+                    setStep(0);
+                  }
                 }
               }}
             >
-              {user ? "My deliveries" : "My account"}
+              {user
+                ? "My deliveries"
+                : operator.persistentAccounts
+                  ? "Log in"
+                  : "My account"}
             </button>
             <button className="button compact" onClick={() => start()}>
               Book a delivery <ArrowUpRight size={17} />
@@ -600,7 +616,28 @@ function App() {
             onExit={() => setActiveDemo(null)}
           />
         )}
-        {page === "demo" ? (
+        {operator.persistentAccounts &&
+        (page === "account" || (page === "booking" && !user)) ? (
+          <div className="container section">
+            <AccountAccess
+              key={accountMode}
+              data={data}
+              initialMode={accountMode}
+              onUser={(u) => {
+                acceptDemoUser(u);
+                setStep(1);
+                setError("");
+                setPage(
+                  u.role === "admin"
+                    ? "dispatch"
+                    : page === "booking"
+                      ? "booking"
+                      : "deliveries",
+                );
+              }}
+            />
+          </div>
+        ) : page === "demo" ? (
           <DemoStudio
             user={user}
             onUser={acceptDemoUser}

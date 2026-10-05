@@ -4,6 +4,41 @@ import { neon } from "@neondatabase/serverless";
 export function hostedStore(url) {
   const sql = neon(url);
   return {
+    async findAccount(email) {
+      return (
+        (
+          await sql`SELECT id,email,password,profile,role FROM corerunner_accounts WHERE email=${email}`
+        )[0] || null
+      );
+    },
+    async createAccount(a) {
+      return (
+        (
+          await sql`INSERT INTO corerunner_accounts (id,email,password,profile,role,snapshot) VALUES (${a.id},${a.email},${a.password},${JSON.stringify(a.profile)}::jsonb,'customer',${JSON.stringify(a.snapshot)}::jsonb) ON CONFLICT(email) DO NOTHING RETURNING id`
+        ).length === 1
+      );
+    },
+    async createAccountSession(token, id, expires) {
+      await sql`DELETE FROM corerunner_account_sessions WHERE expires <= now()`;
+      await sql`INSERT INTO corerunner_account_sessions VALUES (${token},${id},${new Date(expires).toISOString()})`;
+    },
+    async deleteAccountSession(token) {
+      await sql`DELETE FROM corerunner_account_sessions WHERE token=${token}`;
+    },
+    async readAccountSession(token) {
+      return (
+        (
+          await sql`SELECT a.id,a.email,a.profile,a.role,a.snapshot,a.revision FROM corerunner_accounts a JOIN corerunner_account_sessions s ON s.account_id=a.id WHERE s.token=${token} AND s.expires > now()`
+        )[0] || null
+      );
+    },
+    async saveAccount(id, revision, snapshot) {
+      return (
+        (
+          await sql`UPDATE corerunner_accounts SET snapshot=${JSON.stringify(snapshot)}::jsonb,revision=revision+1 WHERE id=${id} AND revision=${revision} RETURNING id`
+        ).length === 1
+      );
+    },
     initialize: () => initializeHostedSchema(sql),
     async read(id) {
       const rows =

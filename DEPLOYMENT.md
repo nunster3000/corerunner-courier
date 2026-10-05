@@ -11,8 +11,8 @@ Local tests cover anonymous workspace creation, browser isolation, cold-instance
 1. Import `nunster3000/corerunner-courier` into Vercel. Use the repository root, Vite framework, Node.js **22.x**, `npm run build`, and `dist`. The committed `vercel.json` routes `/api/*` to the Node function in `api/index.js`; `server/index.js` remains the local-only entrypoint.
 2. In that project's Storage/Marketplace section, connect **Neon Postgres**. Review the provider's plan before provisioning. Use a separate database or branch for preview/testing and for the public portfolio deployment. This adapter uses the Neon HTTP driver, not a generic PostgreSQL TCP connection.
 3. Add the server environment variables below. Keep them out of Git, chat, and all `VITE_` variables. `APP_ORIGIN` must match the exact deployed HTTPS origin, such as `https://your-project.vercel.app`, without a trailing slash. Do not allow wildcard preview origins. Preview deployments need their own matching origin and database configuration.
-4. The hosted API automatically creates its two namespaced demo tables and expiry index on first startup. Initialization is serialized across cold instances and only creates missing objects; it never imports local users, bookings or images. The connected database role needs permission to create these objects. `npm run setup:hosted` remains available for optional manual setup against the intended demo database.
-5. Deploy/redeploy the Vercel project after setting the environment variables. Keep Vercel Deployment Protection enabled for previews. Production visitors open the public demo without a password; simulated account and role actions remain scoped to each browser workspace.
+4. The hosted API automatically creates its namespaced demo, account and account-session tables and their indexes on first startup. Initialization is serialized across cold instances and only creates missing objects; it never imports local users, bookings or images. The connected database role needs permission to create these objects. `npm run setup:hosted` remains available for optional manual setup against the intended demo database.
+5. Deploy/redeploy the Vercel project after setting the environment variables. Keep Vercel Deployment Protection enabled for previews. Production visitors open the public demo without a password. Registered users sign in with their own password; guest role simulations remain browser-scoped.
 6. Verify the checklist below before sharing the URL with reviewers.
 
 | Variable | Required value |
@@ -26,7 +26,7 @@ Generate the server secret using a password manager. `DEMO_ACCESS_PASSWORD` is n
 
 ## Live verification checklist
 
-- A fresh browser opens the homepage without an access prompt. Interactive bookings still use the simulated customer registration flow.
+- A fresh browser opens the homepage without an access prompt. Account creation persists an email, profile, password hash and account-owned delivery snapshot. Verify logout and fresh-browser login.
 - Workspace cookies are HttpOnly, Secure and SameSite=Strict.
 - Start a guided everyday booking, enter dispatch, assign a courier during an eligible Eastern-time shift, and complete a PIN/signature handoff. Reload between steps to verify durable state.
 - Run the grocery readiness scenario and a small sample delivery-photo upload. Never use a real receipt, address or personal photo.
@@ -64,3 +64,11 @@ Limits and retention:
 ## Startup troubleshooting
 
 A successful Vercel build does not confirm that the API has its environment settings. Check Production values for `APP_MODE`, `APP_ORIGIN`, `DEMO_SESSION_SECRET` and `DATABASE_URL`, then redeploy. Missing/invalid setting names appear in server logs without values. Storage initialization failures return a separate code and retry on later requests. The server secret remains required even though visitors do not enter a password.
+
+## Registered accounts
+
+`corerunner_accounts` stores persistent profiles, scrypt hashes, a server-owned role (customer on public signup), and account-owned booking snapshots with optimistic concurrency. Guest cleanup never deletes accounts. `corerunner_account_sessions` stores hashed random tokens with seven-day expiry. Login rate limits are stored in Neon. No new environment variables are needed; schema creation is additive on startup. Passwords are never included in chats or snapshots. Duplicate-email registration cannot overwrite an existing account.
+
+Customer sessions cannot enter guest staff/courier roles or the passwordless demo verification endpoints. Sign out to use the separate public guided demo. A shared admin dashboard and staff provisioning across persistent accounts are not implemented yet. Registered account snapshots are bounded to 8 MiB; use sample data. The homepage remains public.
+
+Email ownership verification, password recovery, account deletion UI, shared recipient tracking, and commercial relational storage remain follow-up work. Previously expired guest identities cannot be recovered as password accounts; users must create a new account. Existing guest names do not establish ownership of an email.

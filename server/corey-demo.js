@@ -149,7 +149,7 @@ export function demoReply(s, message, user, createQuote, listBookings) {
   }
   if (!user)
     return result(
-      "Your details are ready. Use Verify account below, then say “quote”. Verification and email are simulated.",
+      "Your details are ready. Use the account button below to finish signing up, then return here for your quote. Never send your password in this conversation.",
     );
   try {
     s.quote = createQuote(user.id, { ...s.draft, unattended: false });

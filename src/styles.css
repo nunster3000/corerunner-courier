@@ -3099,3 +3099,24 @@ section[id] {
 .service-prices small {
   display: block;
 }
+
+.account-access {
+  max-width: 540px;
+  margin: 42px auto;
+  padding: 28px;
+  background: white;
+  border: 1px solid var(--line, #dbe2ed);
+  border-radius: 20px;
+}
+.account-access .field,
+.account-access .address-field {
+  margin-bottom: 16px;
+}
+.account-access .button {
+  margin: 16px 0;
+  width: 100%;
+}
+.account-access > .muted {
+  font-size: 13px;
+  line-height: 1.6;
+}

@@ -4,7 +4,7 @@ A local full-stack portfolio application for a fictional Atlanta courier service
 
 ## Vercel portfolio deployment
 
-A public hosted-demo entrypoint and visitor-isolated storage adapter are now prepared. The frontend and API run in one Vercel project, with Neon connected through Vercel Marketplace. Visitors enter without a password and receive separate temporary workspaces. See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration, limits, the demo snapshot architecture and required live verification. Vercel deployment and hosted schema initialization have been verified. The local workflow below is unchanged.
+A public hosted-demo entrypoint and visitor-isolated storage adapter are now prepared. The frontend and API run in one Vercel project, with Neon connected through Vercel Marketplace. Visitors enter without a password and receive separate temporary workspaces. See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration, limits, the demo snapshot architecture and required live verification. Vercel deployment and hosted schema initialization have been verified. Registered accounts use persistent Neon account records with scrypt password hashes and seven-day server sessions. They are separate from expiring guest workspaces. Email verification/recovery and a shared operator admin console remain unfinished.
 
 ## Operator handoff direction
 
@@ -60,18 +60,18 @@ npm test             # browser tests on isolated ports and an in-memory database
 npm run format       # format project source
 ```
 
-SQLite is built into Node and is still marked experimental in Node 22. The database is `data/corerunner.sqlite`, with possible WAL sidecar files. This directory is ignored by Git; do not delete it if you want to preserve demo accounts and deliveries. Shut down the API before making a file backup. `DB_PATH` and `API_PORT` are configurable environment variables. No hosted database, Twilio, email credentials, or payment keys are needed.
+SQLite is built into Node and is still marked experimental in Node 22. The current local account store is `data/portfolio.sqlite`. Legacy isolated tests use `data/corerunner.sqlite` or memory, with possible WAL sidecar files. This directory is ignored by Git; do not delete it if you want to preserve demo accounts and deliveries. Shut down the API before making a file backup. `PORTFOLIO_DB_PATH` and `API_PORT` are configurable environment variables. No hosted database, Twilio, email credentials, or payment keys are needed.
 
 Browser tests use installed Google Chrome on macOS when available, otherwise Playwright Chromium. Run `npx playwright install chromium` if needed. `CHROME_PATH` supports another installed Chrome executable. Tests build the frontend and run it without hot reload on ports 5175/3005, with an in-memory API database. They do not touch your working database.
 
 ## Try the complete implemented flow
 
-1. Choose Book a delivery. Enter sample account details and a pickup address naming a supported demo city. Open Demo inbox and simulate verification. Registration and returning sign-in both establish a server session.
+1. Choose Book a delivery to create a saved account with a 12–128 character password, or use Log in for a returning account. Account creation saves data before reporting success. Use sample details; email ownership and recovery are not connected. Passwords never go through Corey.
 2. Enter a destination and recipient email. For this version, one package and one destination are supported. Pick a weight up to 50 pounds, handoff preference, and service.
 3. Review the server-generated demo quote, original total, and possible return fee. Accept the quote and policy, then confirm the demo booking. You can also simulate a declined authorization; no booking or payment event is created on decline.
 4. Open My deliveries to see your saved booking and simulated email inbox. Refresh the browser; the session and records remain available.
-5. Open Demo dispatch in the footer and explicitly enter the local demo staff role. Assign an available sample courier. Move to heading to pickup, then picked up; pickup captures the simulated original charge once.
-6. Follow the recipient tracking link in a private browser window. It works without an account and exposes status, service, courier, event timestamps, and a simulated route using city labels. It grants no booking-management permission.
+5. To explore dispatch and courier operations, sign out and use the separate guided demo. Registered customer accounts cannot grant themselves staff access. Open Demo dispatch in the footer and explicitly enter the temporary demo staff role. Assign an available sample courier. Move to heading to pickup, then picked up; pickup captures the simulated original charge once.
+6. Follow the recipient tracking link within the same demo/account context. Hosted tracking remains scoped to its workspace; sharing across browsers needs a future token lookup adapter. Within that context it exposes status, service, courier, event timestamps, and a simulated route using city labels. It grants no booking-management permission.
 7. Open Demo courier in the footer and choose the assigned courier. Advance through pickup and the delivery route. Only that courier can access and complete the assigned job.
 8. Choose Record delivery proof. For an attended delivery, enter the recipient PIN from the simulated inbox under My deliveries, or have the receiving person enter their name, draw a signature, and confirm receipt. The courier does not receive the PIN through their API.
 9. For an authorized unattended delivery, select a sample photo and confirm the package is at a suitable drop-off location. The server rejects completion without sender consent and valid image evidence. Photos are normalized to WebP and stored privately in SQLite; they are not served from the public directory.
@@ -185,3 +185,7 @@ Technical references: [Node SQLite documentation](https://nodejs.org/api/sqlite.
 ## Hosting direction
 
 The prepared portfolio destination is Vercel with Neon-backed, bounded demo snapshots. Live deployment still needs account setup and verification described in DEPLOYMENT.md. Commercial database/image storage and identity remain separate work. The public GitHub repository contains source and synthetic test fixtures, never local proof uploads or account records.
+
+## Persistent account checks
+
+Run `npm run test:server` and `npx playwright test --config=playwright.accounts.config.js`. The latter runs an isolated password-account store on ports 5176/3006. Tests cover hashed passwords, duplicate-email protection, server restarts, saved bookings, separate-browser login, ownership checks and mobile form layout. Regular `npm test` retains the isolated guest-flow suite.

@@ -1,3 +1,8 @@
+import {
+  installAccounts,
+  accountCookie,
+  accountTokenHash,
+} from "./accounts.js";
 import express from "express";
 import { createHash, randomBytes } from "node:crypto";
 import { createApp } from "./app.js";
@@ -69,10 +74,48 @@ export function createHostedDemo({
   });
   // Below Vercel's request ceiling, including base64 overhead. No disk storage.
   app.use(express.json({ limit: "3mb" }));
+  app.use((req, res, next) => {
+    if (
+      ["POST", "PATCH", "DELETE"].includes(req.method) &&
+      (!req.body || Array.isArray(req.body) || typeof req.body !== "object")
+    )
+      return res.status(400).json({ error: "Provide a JSON object." });
+    next();
+  });
+  installAccounts(app, store, { secure, now, secret });
+  app.use((req, res, next) => {
+    if (
+      store.findAccount &&
+      ["/api/auth/request", "/api/auth/verify", "/api/auth/inbox"].includes(
+        req.path,
+      )
+    )
+      return res.status(410).json({
+        error:
+          "Use Create account with a password, or log in to an existing account.",
+      });
+    next();
+  });
   app.use(async (req, res) => {
+    const account = store.readAccountSession
+      ? await store.readAccountSession(accountTokenHash(accountCookie(req)))
+      : null;
+    if (accountCookie(req) && !account && req.path !== "/api/operator")
+      return res
+        .status(401)
+        .json({ error: "Your login expired. Please log in again." });
+    if (
+      account &&
+      (req.path.startsWith("/api/auth/") || req.path.startsWith("/api/demo/"))
+    )
+      return res.status(403).json({
+        error:
+          "Sign out to use temporary demo identities. Your saved account remains separate.",
+      });
     let token = cookies(req).cr_demo_workspace;
     let id = /^[a-f0-9]{64}$/.test(token || "") ? hash(token) : null;
-    let row = id ? await store.read(id) : null;
+    let row = account || (id ? await store.read(id) : null);
+    if (account) id = account.id;
     const fresh = !row;
     if (fresh && (req.method !== "GET" || req.path !== "/api/operator"))
       return res.status(410).json({
@@ -88,6 +131,7 @@ export function createHostedDemo({
       secureCookies: secure,
       chatState: chat,
       hostedDemo: true,
+      persistentAccounts: !!store.findAccount,
     });
     const end = res.end.bind(res);
     let intercepted = false;
@@ -113,7 +157,29 @@ export function createHostedDemo({
         return res.status(429).json({
           error: "Demo request limit reached. Try again in a minute.",
         });
-      const before = JSON.stringify(captureDemo(db, chat));
+      if (account) {
+        const session = accountTokenHash(accountCookie(req));
+        db.prepare("DELETE FROM sessions").run();
+        db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(
+          session,
+          account.id,
+          now() + 60000,
+        );
+        req.headers.cookie = `cr_session=${accountCookie(req)}; cr_corey=${cookies(req).cr_corey || ""}`;
+      }
+      const beforeSnapshot = captureDemo(db, chat);
+      if (account) {
+        beforeSnapshot.tables.sessions = [];
+        db.prepare("UPDATE users SET profile=? WHERE id=?").run(
+          JSON.stringify({
+            ...account.profile,
+            role: account.role,
+            persistent: true,
+          }),
+          account.id,
+        );
+      }
+      const before = JSON.stringify(beforeSnapshot);
       // Hold the response (including cookies and proof bytes) until persistence succeeds.
       // Every current API endpoint is non-streaming; new streaming routes must use a different adapter.
       const buffered = await new Promise((resolve, reject) => {
@@ -126,9 +192,12 @@ export function createHostedDemo({
         demo(req, res, reject);
       });
       const snapshot = captureDemo(db, chat);
+      if (account) snapshot.tables.sessions = [];
       const after = JSON.stringify(snapshot);
       res.end = end;
-      if (Buffer.byteLength(after) > snapshotLimit) {
+      if (
+        Buffer.byteLength(after) > (account ? 8 * 1024 * 1024 : snapshotLimit)
+      ) {
         res.removeHeader("Set-Cookie");
         res.removeHeader("Content-Length");
         res.removeHeader("ETag");
@@ -137,7 +206,12 @@ export function createHostedDemo({
             "This demo workspace is full. Reset guided scenarios or start again after it expires. Use smaller sample photos.",
         });
       }
-      if (after !== before && !(await store.save(id, row.revision, snapshot))) {
+      if (
+        after !== before &&
+        !(await (account
+          ? store.saveAccount(id, row.revision, snapshot)
+          : store.save(id, row.revision, snapshot)))
+      ) {
         res.removeHeader("Set-Cookie");
         res.removeHeader("Content-Length");
         res.removeHeader("ETag");

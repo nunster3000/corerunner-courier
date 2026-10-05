@@ -5,6 +5,9 @@ export async function initializeHostedSchema(sql) {
     sql`SELECT pg_advisory_xact_lock(hashtext('corerunner_demo_schema_v1'))`,
     sql`CREATE TABLE IF NOT EXISTS corerunner_demo_workspaces (id text PRIMARY KEY, snapshot jsonb NOT NULL, revision integer NOT NULL DEFAULT 0, expires timestamptz NOT NULL)`,
     sql`CREATE INDEX IF NOT EXISTS corerunner_demo_expiry ON corerunner_demo_workspaces(expires)`,
+    sql`CREATE TABLE IF NOT EXISTS corerunner_accounts (id text PRIMARY KEY, email text UNIQUE NOT NULL, password text NOT NULL, profile jsonb NOT NULL, role text NOT NULL DEFAULT 'customer' CHECK (role IN ('customer','admin')), snapshot jsonb NOT NULL, revision integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now())`,
+    sql`CREATE TABLE IF NOT EXISTS corerunner_account_sessions (token text PRIMARY KEY, account_id text NOT NULL REFERENCES corerunner_accounts(id) ON DELETE CASCADE, expires timestamptz NOT NULL)`,
+    sql`CREATE INDEX IF NOT EXISTS corerunner_account_session_expiry ON corerunner_account_sessions(expires)`,
     sql`CREATE TABLE IF NOT EXISTS corerunner_demo_limits (id text PRIMARY KEY, bucket bigint NOT NULL, count integer NOT NULL, expires timestamptz NOT NULL)`,
   ]);
 }

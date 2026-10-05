@@ -1,3 +1,4 @@
+import { operator } from "./operator.js";
 import AddressInput from "./AddressInput.jsx";
 import ServicePrices from "./ServicePrices.jsx";
 import React, { useEffect, useRef, useState } from "react";
@@ -197,8 +198,14 @@ export default function CoreyChat({
           draft?.phone &&
           draft?.pickup &&
           !verification && (
-            <button className="button" disabled={busy} onClick={verify}>
-              Verify account
+            <button
+              className="button"
+              disabled={busy}
+              onClick={operator.persistentAccounts ? onForm : verify}
+            >
+              {operator.persistentAccounts
+                ? "Set password & create account"
+                : "Verify account"}
             </button>
           )}
         {verification && (
