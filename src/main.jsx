@@ -1,3 +1,4 @@
+import HostedAccess from "./HostedAccess";
 import { operator, loadOperator } from "./operator";
 import DemoStudio, { DemoGuide } from "./DemoStudio";
 import { WindowAvailability } from "./ScheduleBoard";
@@ -483,10 +484,19 @@ function App() {
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
+      {operator.hostedDemo && (
+        <aside className="hosted-notice">
+          Use sample data only. Your temporary workspace is separate from other
+          visitors. No real emails, payments or AI requests. Tracking links stay
+          within this browser.
+        </aside>
+      )}
       <div className="preview-strip">
         PORTFOLIO PREVIEW <span>Meet your next everyday delivery.</span>
         <span className="preview-right">
-          Local demo · no real deliveries or payments
+          {operator.hostedDemo
+            ? "Private demo · expires in 2 hours"
+            : "Local demo · no real deliveries or payments"}
         </span>
       </div>
       <header>
@@ -1525,7 +1535,11 @@ root.render(
 );
 loadOperator()
   .then(() => root.render(<App />))
-  .catch(() => {
+  .catch((error) => {
+    if (error.status === 401) {
+      root.render(<HostedAccess />);
+      return;
+    }
     root.render(
       <main className="container">
         <h1>Service unavailable</h1>

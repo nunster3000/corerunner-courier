@@ -250,3 +250,7 @@ Also define email-link expiration, evidence retention, location freshness, suppo
 ### Central operator configuration implemented
 
 `config/operator.json` controls company identity, primary/accent colors, displayed and backend-enforced demo coverage, and versioned USD quote rates. Settings are validated at startup and served through an allowlisted read-only endpoint. Existing quote/booking prices remain snapshots. Buyers edit this file and restart; there is no settings dashboard yet. The Eastern timezone, fixed service policies, agent name and production integrations remain separate work.
+
+### Vercel-only portfolio hosting decision
+
+The user chose everything on Vercel rather than a separate Node hosting provider. A Node API function, Vite frontend routing, Neon Marketplace store and protected visitor-specific demo workspaces are prepared. The low-traffic demo adapter persists bounded SQLite table snapshots and scripted chat state in Postgres, with revision checks before confirming responses. It is not a normalized production database migration. No real AI or commercial integrations are activated. Live Neon and Vercel verification is pending account configuration; DEPLOYMENT.md records setup and limitations.

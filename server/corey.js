@@ -115,10 +115,16 @@ export function openAIProvider({
 
 export function installCorey(
   app,
-  { provider, mock = false, getUser, createQuote, listBookings },
+  {
+    provider,
+    mock = false,
+    getUser,
+    createQuote,
+    listBookings,
+    state = { sessions: new Map(), requestTimes: [] },
+  },
 ) {
-  const sessions = new Map();
-  let requestTimes = [];
+  const sessions = state.sessions;
   const session = (req, res) => {
     for (const [key, s] of sessions)
       if (s.expires < Date.now()) sessions.delete(key);
@@ -183,13 +189,15 @@ export function installCorey(
     const message = req.body.message;
     if (typeof message !== "string" || !message.trim() || message.length > 2000)
       fail(400, "Send a message between 1 and 2,000 characters.");
-    requestTimes = requestTimes.filter((t) => t > Date.now() - 60000);
-    if (requestTimes.length >= 20 || s.turns >= 40)
+    state.requestTimes = state.requestTimes.filter(
+      (t) => t > Date.now() - 60000,
+    );
+    if (state.requestTimes.length >= 20 || s.turns >= 40)
       fail(
         429,
         "Conversation limit reached. Try again later or use the booking form.",
       );
-    requestTimes.push(Date.now());
+    state.requestTimes.push(Date.now());
     s.turns++;
     // A checkpoint keeps failed provider turns from leaving half-applied drafts or tool sequences.
     const draft = { ...s.draft };

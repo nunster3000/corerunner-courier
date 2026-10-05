@@ -47,11 +47,22 @@ export function createApp({
   aiProvider = null,
   coreyMode = "mock",
   scheduleNow = () => new Date(),
+  allowedOrigins = null,
+  secureCookies = false,
+  hostedDemo = false,
+  chatState = { sessions: new Map(), requestTimes: [] },
 } = {}) {
   const app = express(),
     db = openDatabase(dbPath);
   const scheduling = scheduler(db, scheduleNow);
   app.disable("x-powered-by");
+  if (secureCookies)
+    app.use((req, res, next) => {
+      const setCookie = res.cookie.bind(res);
+      res.cookie = (name, value, options) =>
+        setCookie(name, value, { ...options, secure: true });
+      next();
+    });
   app.use((req, res, next) => {
     res.set("Cache-Control", "no-store");
     res.set("X-Content-Type-Options", "nosniff");
@@ -61,7 +72,11 @@ export function createApp({
     if (origin) {
       try {
         const u = new URL(origin);
-        if (!["localhost", "127.0.0.1"].includes(u.hostname))
+        if (
+          allowedOrigins
+            ? !allowedOrigins.includes(u.origin)
+            : !["localhost", "127.0.0.1"].includes(u.hostname)
+        )
           return res
             .status(403)
             .json({ error: "Cross-origin requests are not allowed." });
@@ -85,7 +100,7 @@ export function createApp({
       return res.status(400).json({ error: "Provide a JSON object." });
     next();
   });
-  app.get("/api/operator", (req, res) => res.json(operator));
+  app.get("/api/operator", (req, res) => res.json({ ...operator, hostedDemo }));
   const auth = (req, res, next) => {
     const s = db
       .prepare(
@@ -343,6 +358,7 @@ export function createApp({
     return q;
   };
   installCorey(app, {
+    state: chatState,
     provider: aiProvider,
     mock: coreyMode === "mock" && !aiProvider,
     getUser: (req) =>

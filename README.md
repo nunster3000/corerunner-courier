@@ -2,13 +2,17 @@
 
 A local full-stack portfolio application for a fictional Atlanta courier service. React provides customer, dispatch, and courier experiences; an Express API and SQLite own accounts, quotes, bookings, assignments, handoff proof, status events, and simulated payment records. Open this folder in VS Code. Agreed product requirements remain in [PROJECT_BLUEPRINT.md](PROJECT_BLUEPRINT.md).
 
+## Vercel portfolio deployment
+
+A protected hosted-demo entrypoint and visitor-isolated storage adapter are now prepared. The frontend and API run in one Vercel project, with Neon connected through Vercel Marketplace. Each reviewer uses a password-gated temporary workspace. See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration, limits, the demo snapshot architecture and required live verification. No cloud deployment or live database connection has been verified yet. The local workflow below is unchanged.
+
 ## Operator handoff direction
 
 The intended deliverable is a reusable application for **one courier company at a time**, with a polished mock mode for demonstrations and optional real service integrations supplied by a future owner. Today this is a runnable local portfolio demo, not a production-ready plug-and-play courier business. A buyer can run the demo without AI, maps, email or payment credentials. The local database initializes automatically on startup.
 
-Before a commercial launch, complete the remaining operational configuration and production customer/staff/courier identity, hosted database and private image storage, deployment settings, and the buyer’s chosen email, payment and routing/tracking adapters. Finish operational exception/refund workflows and validate the operator’s policies. Multi-company tenancy is outside this single-operator architecture. Keep demo-role entry, generated scenarios and demo reset disabled in a production build; the current server deliberately refuses production startup.
+Before a commercial launch, complete the remaining operational configuration and production customer/staff/courier identity, hosted database and private image storage, deployment settings, and the buyer’s chosen email, payment and routing/tracking adapters. Finish operational exception/refund workflows and validate the operator’s policies. Multi-company tenancy is outside this single-operator architecture. The hosted entrypoint supports only isolated portfolio workspaces. A real operator deployment must disable demo-role entry and generated scenarios; the local server still deliberately refuses production startup.
 
-From a clean, committed Git checkout, `npm run package:handoff` exports `artifacts/CoreRunner-source.zip`. It includes committed source, tests, setup instructions and `.env.example`, with a `corerunner-courier/` root folder. It excludes ignored local credentials, databases, proof uploads, installed dependencies, build output and Git history. A guard rejects tracked local-data/credential-file paths; this is not a substitute for reviewing source before release. Unzip, install Node.js 22.13 or newer, run `npm ci`, then `npm run dev` to try the demo. A source archive is not a hosted deployment or an operating-service license.
+From a clean, committed Git checkout, `npm run package:handoff` exports `artifacts/CoreRunner-source.zip`. It includes committed source, tests, setup instructions and `.env.example`, with a `corerunner-courier/` root folder. It excludes ignored local credentials, databases, proof uploads, installed dependencies, build output and Git history. A guard rejects tracked local-data/credential-file paths; this is not a substitute for reviewing source before release. Unzip, install Node.js 22.x (22.13 or newer within that release line), run `npm ci`, then `npm run dev` to try the demo. A source archive is not a hosted deployment or an operating-service license.
 
 ## Configure a courier company
 
@@ -35,11 +39,11 @@ Open **Explore the guided demo** on the homepage, **Guided demo** in the footer,
 
 A guide above the workspace suggests the next role and action using the current backend status. Tracking opens separately. Scenario creation is retry-safe, and existing scenarios can be resumed from the overview. Current Eastern-time shift hours and roster availability still apply; outside operating hours, samples can be created and inspected but assignment may wait for an eligible shift. Corey remains scripted.
 
-Reset requires an explicit checkbox and removes only backend-tagged scenario bookings for the **current account and browser cookie**. It removes their linked quotes, payments, events, notifications, proof images, grocery evidence and tracking links, releasing any associated courier reservation. It preserves ordinary bookings (including ordinary bookings on the same account), other browsers’ scenarios, accounts, shifts and other local work. Scenario deletion is for walkthrough data only; it is never the business cancellation flow. All scenario/reset endpoints require local demo mode. The public-hosting visitor isolation work is still separate.
+Reset requires an explicit checkbox and removes only backend-tagged scenario bookings for the **current account and browser cookie**. It removes their linked quotes, payments, events, notifications, proof images, grocery evidence and tracking links, releasing any associated courier reservation. It preserves ordinary bookings (including ordinary bookings on the same account), other browsers’ scenarios, accounts, shifts and other local work. Scenario deletion is for walkthrough data only; it is never the business cancellation flow. All scenario/reset endpoints require demo mode; hosted access adds a private workspace boundary. Hosted portfolio workspaces add a separate visitor boundary; see DEPLOYMENT.md.
 
 ## Run in VS Code
 
-Use Node.js 22.13 or newer. From the project terminal:
+Use Node.js 22.x (22.13 or newer within that release line). From the project terminal:
 
 ```sh
 npm install
@@ -91,7 +95,7 @@ There is no generic completion bypass in dispatch. Delivered and returned status
 | Grocery screenshot uploads, staff approval/rejection, resubmission and current-date assignment checks | Human review only; no OCR or store integration |
 | Customer-scoped notification history | Demo inbox includes sender and recipient copies; nothing is sent |
 
-This application binds to loopback and refuses a production start. Demo authentication can impersonate any sample email, so **use sample data and do not expose this server publicly**. This is intentional for a local portfolio walkthrough; it is not an authentication system suitable for a deployed service. Public deployment requires a real email provider, stronger staff identity, token delivery, operational authorization, abuse controls, and a production hosting configuration.
+The local entrypoint binds to loopback and refuses a production start. Demo authentication can impersonate any sample email, so **use sample data and do not expose this server publicly**. This is intentional for a local portfolio walkthrough; it is not an authentication system suitable for a deployed service. Real business deployment requires a real email provider, stronger staff identity, token delivery, operational authorization, abuse controls, and production hosting. The separate protected portfolio entrypoint isolates simulated roles inside temporary visitor workspaces.
 
 ## Corey: scripted portfolio demo
 
@@ -178,4 +182,4 @@ Technical references: [Node SQLite documentation](https://nodejs.org/api/sqlite.
 
 ## Hosting direction
 
-The intended destination is Vercel with a hosted database. This local implementation still uses SQLite and is not deployment-ready. Database and image storage must be migrated before deployment, and local demo identity must be replaced or isolated appropriately. The public GitHub repository contains source and synthetic test fixtures, never local proof uploads or account records.
+The prepared portfolio destination is Vercel with Neon-backed, bounded demo snapshots. Live deployment still needs account setup and verification described in DEPLOYMENT.md. Commercial database/image storage and identity remain separate work. The public GitHub repository contains source and synthetic test fixtures, never local proof uploads or account records.

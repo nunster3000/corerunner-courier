@@ -11,3 +11,5 @@ coverage/
 *.pem
 *.key
 artifacts/
+
+.vercel/

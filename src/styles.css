@@ -3012,3 +3012,36 @@ section[id] {
     justify-content: center;
   }
 }
+
+.hosted-access {
+  max-width: 760px;
+  padding-block: 64px;
+}
+.hosted-access h1 {
+  letter-spacing: -1.2px;
+  font-size: clamp(32px, 6vw, 56px);
+}
+.hosted-access > p {
+  line-height: 1.7;
+}
+.hosted-access form {
+  display: grid;
+  gap: 16px;
+  max-width: 440px;
+  margin: 32px 0;
+}
+.hosted-access input {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.hosted-notice {
+  padding: 10px 24px;
+  text-align: center;
+  background: #fff6da;
+  color: #142348;
+  font-size: 13px;
+  line-height: 1.5;
+}

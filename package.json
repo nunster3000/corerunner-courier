@@ -12,9 +12,11 @@
     "api": "node --watch server/index.js",
     "test:server": "node --test server/*.test.js",
     "pretest": "npm run build",
-    "package:handoff": "node scripts/package-handoff.mjs"
+    "package:handoff": "node scripts/package-handoff.mjs",
+    "setup:hosted": "node scripts/setup-hosted-store.mjs"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "express": "^5.2.1",
     "lucide-react": "^0.468.0",
     "react": "^19.3.0",
@@ -27,6 +29,6 @@
     "vite": "^8.3.2"
   },
   "engines": {
-    "node": ">=22.13.0"
+    "node": "22.x"
   }
 }
