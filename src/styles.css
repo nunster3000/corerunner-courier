@@ -3157,3 +3157,11 @@ section[id] {
 .password-match {
   font-size: 12px;
 }
+
+.account-access p {
+  overflow-wrap: anywhere;
+}
+.account-access .corey-card > small {
+  display: block;
+  margin-bottom: 12px;
+}

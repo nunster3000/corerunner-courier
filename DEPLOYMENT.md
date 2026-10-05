@@ -69,6 +69,12 @@ A successful Vercel build does not confirm that the API has its environment sett
 
 `corerunner_accounts` stores persistent profiles, scrypt hashes, a server-owned role (customer on public signup), and account-owned booking snapshots with optimistic concurrency. Guest cleanup never deletes accounts. `corerunner_account_sessions` stores hashed random tokens with seven-day expiry. Login rate limits are stored in Neon. No new environment variables are needed; schema creation is additive on startup. Passwords are never included in chats or snapshots. Duplicate-email registration cannot overwrite an existing account.
 
-Customer sessions cannot enter guest staff/courier roles or the passwordless demo verification endpoints. Sign out to use the separate public guided demo. A shared admin dashboard and staff provisioning across persistent accounts are not implemented yet. Registered account snapshots are bounded to 8 MiB; use sample data. The homepage remains public.
+Customer sessions cannot enter guest staff/courier roles or passwordless guest identities. Sign out to use the separate public guided demo. A shared admin dashboard and staff provisioning across persistent accounts are not implemented yet. Registered account snapshots are bounded to 8 MiB; use sample data. The homepage remains public.
 
 Email ownership verification, password recovery, account deletion UI, shared recipient tracking, and commercial relational storage remain follow-up work. Previously expired guest identities cannot be recovered as password accounts; users must create a new account. Existing guest names do not establish ownership of an email.
+
+## Post-signup demo verification
+
+Persistent accounts default to `email_verified=false`, including accounts created before the inbox was restored. They can log in, request a demo email, read their session-bound inbox, verify, or sign out; protected booking and dashboard APIs return `EMAIL_VERIFICATION_REQUIRED` until completion. Signup data stays saved if verification is interrupted. No existing account or booking is deleted by this migration.
+
+The inbox is explicitly simulated and requires the authenticated account session. Challenges expire after ten minutes, are replaced on resend, and are consumed atomically when verified. Neon retains only the challenge hash, session hash, nonce and expiry; the displayed token is derived server-side. Verification status persists across browsers and future logins. This demonstrates the workflow and does not prove actual mailbox ownership.

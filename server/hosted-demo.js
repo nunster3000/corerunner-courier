@@ -83,19 +83,6 @@ export function createHostedDemo({
     next();
   });
   installAccounts(app, store, { secure, now, secret });
-  app.use((req, res, next) => {
-    if (
-      store.findAccount &&
-      ["/api/auth/request", "/api/auth/verify", "/api/auth/inbox"].includes(
-        req.path,
-      )
-    )
-      return res.status(410).json({
-        error:
-          "Use Create account with a password, or log in to an existing account.",
-      });
-    next();
-  });
   app.use(async (req, res) => {
     const account = store.readAccountSession
       ? await store.readAccountSession(accountTokenHash(accountCookie(req)))
@@ -112,6 +99,18 @@ export function createHostedDemo({
         error:
           "Sign out to use temporary demo identities. Your saved account remains separate.",
       });
+    if (
+      account &&
+      !account.email_verified &&
+      !["/api/me", "/api/operator"].includes(req.path)
+    )
+      return res
+        .status(403)
+        .json({
+          code: "EMAIL_VERIFICATION_REQUIRED",
+          error:
+            "Open your demo inbox and verify your email before continuing.",
+        });
     let token = cookies(req).cr_demo_workspace;
     let id = /^[a-f0-9]{64}$/.test(token || "") ? hash(token) : null;
     let row = account || (id ? await store.read(id) : null);
@@ -175,6 +174,7 @@ export function createHostedDemo({
             ...account.profile,
             role: account.role,
             persistent: true,
+            emailVerified: !!account.email_verified,
           }),
           account.id,
         );

@@ -9,10 +9,22 @@ export function localPortfolioStore(path) {
     CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE,password TEXT,profile TEXT,role TEXT,snapshot TEXT,revision INTEGER DEFAULT 0);
     CREATE TABLE IF NOT EXISTS account_sessions(token TEXT PRIMARY KEY,account_id TEXT REFERENCES accounts(id),expires INTEGER);
     CREATE TABLE IF NOT EXISTS limits(id TEXT PRIMARY KEY,bucket INTEGER,count INTEGER);`);
+  const columns = db
+    .prepare("PRAGMA table_info(accounts)")
+    .all()
+    .map((c) => c.name);
+  if (!columns.includes("email_verified"))
+    db.exec(
+      "ALTER TABLE accounts ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
+    );
+  if (!columns.includes("verification"))
+    db.exec("ALTER TABLE accounts ADD COLUMN verification TEXT");
   const decode = (row) =>
     row
       ? {
           ...row,
+          email_verified: !!row.email_verified,
+          verification: row.verification ? JSON.parse(row.verification) : null,
           ...(row.snapshot ? { snapshot: JSON.parse(row.snapshot) } : {}),
           ...(row.profile ? { profile: JSON.parse(row.profile) } : {}),
         }
@@ -55,9 +67,23 @@ export function localPortfolioStore(path) {
       return decode(
         db
           .prepare(
-            "SELECT id,email,password,profile,role FROM accounts WHERE email=?",
+            "SELECT id,email,password,profile,role,email_verified FROM accounts WHERE email=?",
           )
           .get(email),
+      );
+    },
+    async setVerification(id, verification) {
+      db.prepare(
+        "UPDATE accounts SET verification=? WHERE id=? AND email_verified=0",
+      ).run(JSON.stringify(verification), id);
+    },
+    async verifyAccount(id, session, token, now) {
+      return (
+        db
+          .prepare(
+            "UPDATE accounts SET email_verified=1,verification=NULL WHERE id=? AND email_verified=0 AND json_extract(verification,'$.session')=? AND json_extract(verification,'$.token')=? AND json_extract(verification,'$.expires')>?",
+          )
+          .run(id, session, token, now).changes === 1
       );
     },
     async createAccount(a) {

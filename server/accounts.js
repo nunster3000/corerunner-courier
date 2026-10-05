@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, createHash } from "node:crypto";
+import { randomBytes, randomUUID, createHash, createHmac } from "node:crypto";
 import { profile, email, Problem } from "./domain.js";
 import { passwordHash, passwordMatches } from "./passwords.js";
 import { createApp } from "./app.js";
@@ -13,6 +13,13 @@ export const accountCookie = (req) =>
     .map((p) => p.trim())
     .find((p) => p.startsWith("cr_account="))
     ?.slice(11);
+export const accountUser = (account) => ({
+  ...account.profile,
+  id: account.id,
+  role: account.role,
+  persistent: true,
+  emailVerified: !!account.email_verified,
+});
 export function installAccounts(app, store, { secure, now, secret }) {
   if (!store.findAccount) return;
   const cookie = {
@@ -64,14 +71,7 @@ export function installAccounts(app, store, { secure, now, secret }) {
       "cr_corey",
     ])
       res.clearCookie(name, { path: "/api" });
-    res.json({
-      user: {
-        ...account.profile,
-        id: account.id,
-        role: account.role,
-        persistent: true,
-      },
-    });
+    res.json({ user: accountUser(account) });
   }
   app.post(
     "/api/auth/register",
@@ -120,6 +120,81 @@ export function installAccounts(app, store, { secure, now, secret }) {
       if (!account || !valid)
         throw new Problem(401, "Email or password is incorrect.");
       await signIn(res, account);
+    }),
+  );
+  const signedAccount = async (req) => {
+    const account = await store.readAccountSession(
+      accountTokenHash(accountCookie(req)),
+    );
+    if (!account) throw new Problem(401, "Log in to open your demo inbox.");
+    return account;
+  };
+  const verificationToken = (account, session, expires, nonce) =>
+    createHmac("sha256", secret)
+      .update(`${account.id}:${session}:${expires}:${nonce}`)
+      .digest("hex");
+  app.post(
+    "/api/auth/request",
+    route(async (req, res) => {
+      const account = await signedAccount(req);
+      if (account.email_verified) return res.json({ verified: true });
+      if (!(await store.allow(`verify:${account.id}`, 10, 15 * 60000, now())))
+        throw new Problem(
+          429,
+          "Please wait before requesting another demo email.",
+        );
+      const session = accountTokenHash(accountCookie(req)),
+        expires = now() + 10 * 60000,
+        nonce = randomBytes(16).toString("hex");
+      await store.setVerification(account.id, {
+        session,
+        expires,
+        nonce,
+        token: accountTokenHash(
+          verificationToken(account, session, expires, nonce),
+        ),
+      });
+      res.json({ email: account.email, simulated: true });
+    }),
+  );
+  app.get(
+    "/api/auth/inbox",
+    route(async (req, res) => {
+      const account = await signedAccount(req),
+        v = account.verification,
+        session = accountTokenHash(accountCookie(req));
+      if (!v || v.session !== session || v.expires <= now())
+        throw new Problem(404, "Request a new demo verification email.");
+      res.json({
+        email: account.email,
+        token: verificationToken(account, session, v.expires, v.nonce),
+        expires: v.expires,
+        simulated: true,
+      });
+    }),
+  );
+  app.post(
+    "/api/auth/verify",
+    route(async (req, res) => {
+      const account = await signedAccount(req),
+        session = accountTokenHash(accountCookie(req));
+      if (
+        typeof req.body.token !== "string" ||
+        !(await store.verifyAccount(
+          account.id,
+          session,
+          accountTokenHash(req.body.token),
+          now(),
+        ))
+      )
+        throw new Problem(
+          400,
+          "Verification expired or invalid. Request another demo email.",
+        );
+      res.json({
+        user: accountUser({ ...account, email_verified: true }),
+        simulated: true,
+      });
     }),
   );
   app.post(

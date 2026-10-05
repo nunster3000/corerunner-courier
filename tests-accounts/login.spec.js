@@ -24,12 +24,34 @@ test("visitor creates a password account, logs out and signs back in from anothe
     .getByRole("button", { name: "Create account", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Sign out", exact: true }),
+    page.getByRole("heading", { name: "Verify your email" }),
   ).toBeVisible();
+  const unverified = await (await page.request.get("/api/me")).json();
+  expect(unverified.user.emailVerified).toBe(false);
+  expect((await page.request.get("/api/bookings")).status()).toBe(403);
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "Sign out", exact: true }),
+    page.getByRole("heading", { name: "Verify your email" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Open demo inbox" }).click();
+  await expect(page.getByRole("heading", { name: "Demo inbox" })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/saved-account-demo-inbox.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page
+    .getByRole("button", { name: "Simulate email verification" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Verify your email" }),
+  ).not.toBeVisible();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Log in", exact: true }),
@@ -58,6 +80,7 @@ test("visitor creates a password account, logs out and signs back in from anothe
   const me = await (await second.request.get("/api/me")).json();
   expect(me.user.name).toBe("Saved Demo Visitor");
   expect(me.user.persistent).toBe(true);
+  expect(me.user.emailVerified).toBe(true);
   await second.setViewportSize({ width: 390, height: 844 });
   await second
     .getByRole("button", { name: "Book a delivery", exact: true })
@@ -122,6 +145,10 @@ test("Corey hands registration to the password form without sending the password
     .fill("Corey test password only 84!");
   await page
     .getByRole("button", { name: "Create account", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Open demo inbox" }).click();
+  await page
+    .getByRole("button", { name: "Simulate email verification" })
     .click();
   await expect(
     page.getByLabel("Delivery address", { exact: true }),

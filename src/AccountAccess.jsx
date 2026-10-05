@@ -195,8 +195,8 @@ export default function AccountAccess({
           : "New here? Create an account"}
       </button>
       <p className="muted">
-        Courier service, payments and email remain simulated. Email ownership is
-        not verified. Password recovery by email is not connected yet.
+        After signup, verify your email in the demo inbox. No real email is
+        sent; mailbox ownership and password recovery are not connected.
       </p>
     </section>
   );

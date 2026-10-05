@@ -1,3 +1,4 @@
+import DemoVerification from "./DemoVerification.jsx";
 import AccountAccess from "./AccountAccess.jsx";
 import AddressInput from "./AddressInput.jsx";
 import { useServicePrices } from "./ServicePrices.jsx";
@@ -259,7 +260,7 @@ function App() {
   };
   const acceptDemoUser = (u) => {
     setUser(u);
-    setVerified(true);
+    setVerified(!u.persistent || !!u.emailVerified);
     setData((d) => ({
       ...d,
       name: u.name,
@@ -319,7 +320,7 @@ function App() {
     api("/me")
       .then(({ user }) => {
         setUser(user);
-        setVerified(true);
+        setVerified(!user.persistent || !!user.emailVerified);
         setData((d) => ({
           ...d,
           name: user.name,
@@ -616,8 +617,20 @@ function App() {
             onExit={() => setActiveDemo(null)}
           />
         )}
-        {operator.persistentAccounts &&
-        (page === "account" || (page === "booking" && !user)) ? (
+        {user?.persistent && !user.emailVerified ? (
+          <div className="container section">
+            <DemoVerification
+              user={user}
+              onSignOut={signOut}
+              onVerified={(u) => {
+                acceptDemoUser(u);
+                setStep(1);
+                setPage(page === "booking" ? "booking" : "deliveries");
+              }}
+            />
+          </div>
+        ) : operator.persistentAccounts &&
+          (page === "account" || (page === "booking" && !user)) ? (
           <div className="container section">
             <AccountAccess
               key={accountMode}
@@ -1541,11 +1554,13 @@ function App() {
         </div>
         <small>{operator.brand.name} · Fictional portfolio project</small>
       </footer>
-      {!chat && !["courier", "demo"].includes(page) && (
-        <button className="floating-corey" onClick={openChat}>
-          <Sparkles size={19} /> Ask Corey <span />
-        </button>
-      )}
+      {!chat &&
+        !(user?.persistent && !user.emailVerified) &&
+        !["courier", "demo"].includes(page) && (
+          <button className="floating-corey" onClick={openChat}>
+            <Sparkles size={19} /> Ask Corey <span />
+          </button>
+        )}
       <CoreyChat
         open={chat}
         data={data}

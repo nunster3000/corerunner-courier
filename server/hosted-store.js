@@ -7,8 +7,18 @@ export function hostedStore(url) {
     async findAccount(email) {
       return (
         (
-          await sql`SELECT id,email,password,profile,role FROM corerunner_accounts WHERE email=${email}`
+          await sql`SELECT id,email,password,profile,role,email_verified FROM corerunner_accounts WHERE email=${email}`
         )[0] || null
+      );
+    },
+    async setVerification(id, verification) {
+      await sql`UPDATE corerunner_accounts SET verification=${JSON.stringify(verification)}::jsonb WHERE id=${id} AND email_verified=false`;
+    },
+    async verifyAccount(id, session, token, now) {
+      return (
+        (
+          await sql`UPDATE corerunner_accounts SET email_verified=true,verification=NULL WHERE id=${id} AND email_verified=false AND verification->>'session'=${session} AND verification->>'token'=${token} AND (verification->>'expires')::bigint>${now} RETURNING id`
+        ).length === 1
       );
     },
     async createAccount(a) {
@@ -28,7 +38,7 @@ export function hostedStore(url) {
     async readAccountSession(token) {
       return (
         (
-          await sql`SELECT a.id,a.email,a.profile,a.role,a.snapshot,a.revision FROM corerunner_accounts a JOIN corerunner_account_sessions s ON s.account_id=a.id WHERE s.token=${token} AND s.expires > now()`
+          await sql`SELECT a.id,a.email,a.profile,a.role,a.snapshot,a.revision,a.email_verified,a.verification FROM corerunner_accounts a JOIN corerunner_account_sessions s ON s.account_id=a.id WHERE s.token=${token} AND s.expires > now()`
         )[0] || null
       );
     },
