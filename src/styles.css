@@ -3120,3 +3120,40 @@ section[id] {
   font-size: 13px;
   line-height: 1.6;
 }
+
+.password-requirements {
+  margin: -4px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid #dbe2ed;
+  border-radius: 12px;
+  background: #f7f9fd;
+}
+.password-requirements p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.password-requirements ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+}
+.password-requirements li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 6px 0;
+  color: #536079;
+  font-size: 13px;
+}
+.password-requirements li.met,
+.password-match {
+  color: #176344;
+}
+.password-requirements li.met {
+  font-weight: 600;
+}
+.password-requirements small,
+.password-match {
+  font-size: 12px;
+}

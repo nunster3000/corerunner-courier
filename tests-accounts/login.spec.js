@@ -135,3 +135,59 @@ test("Corey hands registration to the password form without sending the password
   });
   expect((await next.json()).pending).toBe("dropoff");
 });
+
+test("password tracker updates each requirement and confirmation as the visitor types", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Book a delivery", exact: true })
+    .click();
+  const password = page.getByLabel("Password", { exact: true });
+  const rules = page.getByRole("list", { name: "Password requirements" });
+  const create = page.getByRole("button", {
+    name: "Create account",
+    exact: true,
+  });
+  await expect(
+    page.getByText("0 of 4 password requirements met"),
+  ).toBeVisible();
+  await expect(create).toBeDisabled();
+  await password.fill("abcdefgh");
+  await expect(
+    rules.getByText("At least 8 characters", { exact: false }),
+  ).toHaveClass("met");
+  await expect(
+    page.getByText("1 of 4 password requirements met"),
+  ).toBeVisible();
+  await password.fill("Abcdefgh");
+  await expect(
+    page.getByText("2 of 4 password requirements met"),
+  ).toBeVisible();
+  await password.fill("Abcdefg1");
+  await expect(
+    page.getByText("3 of 4 password requirements met"),
+  ).toBeVisible();
+  await password.fill("Abcdef1!");
+  await expect(
+    page.getByText("4 of 4 password requirements met"),
+  ).toBeVisible();
+  await expect(create).toBeDisabled();
+  await page.getByLabel("Confirm password", { exact: true }).fill("Abcdef1!");
+  await expect(
+    page.getByText("✓ Passwords match", { exact: true }),
+  ).toBeVisible();
+  await expect(create).toBeEnabled();
+  await password.fill("Abcdef1 ");
+  await expect(
+    page.getByText("3 of 4 password requirements met"),
+  ).toBeVisible();
+  await expect(create).toBeDisabled();
+  await password.fill("Abcdef1!");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(".password-requirements").scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: "test-results/password-requirements-mobile.png",
+    fullPage: true,
+  });
+});

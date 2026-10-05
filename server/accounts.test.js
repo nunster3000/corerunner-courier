@@ -10,7 +10,7 @@ const profile = {
   email: "saved@example.com",
   phone: "4045550123",
   pickup: "100 Sample Street, Atlanta",
-  password: "Only-a-test-password-73!",
+  password: "Demo123!",
 };
 async function fixture(path) {
   const store = localPortfolioStore(path);

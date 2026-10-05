@@ -66,7 +66,7 @@ Browser tests use installed Google Chrome on macOS when available, otherwise Pla
 
 ## Try the complete implemented flow
 
-1. Choose Book a delivery to create a saved account with a 12–128 character password, or use Log in for a returning account. Account creation saves data before reporting success. Use sample details; email ownership and recovery are not connected. Passwords never go through Corey.
+1. Choose Book a delivery to create a saved account with an 8–128 character password containing an uppercase letter, a number, and a special character, or use Log in for a returning account. Account creation saves data before reporting success. Use sample details; email ownership and recovery are not connected. Passwords never go through Corey.
 2. Enter a destination and recipient email. For this version, one package and one destination are supported. Pick a weight up to 50 pounds, handoff preference, and service.
 3. Review the server-generated demo quote, original total, and possible return fee. Accept the quote and policy, then confirm the demo booking. You can also simulate a declined authorization; no booking or payment event is created on decline.
 4. Open My deliveries to see your saved booking and simulated email inbox. Refresh the browser; the session and records remain available.

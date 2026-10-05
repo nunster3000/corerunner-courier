@@ -1,14 +1,13 @@
+import {
+  validNewPassword,
+  passwordGuidance,
+} from "../shared/password-policy.js";
 import { randomBytes, scrypt as derive, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { fail } from "./domain.js";
 const scrypt = promisify(derive);
 export async function passwordHash(password) {
-  if (
-    typeof password !== "string" ||
-    password.length < 12 ||
-    password.length > 128
-  )
-    fail(400, "Choose a password between 12 and 128 characters.");
+  if (!validNewPassword(password)) fail(400, passwordGuidance);
   const salt = randomBytes(16).toString("hex");
   const key = await scrypt(password, salt, 64);
   return `${salt}:${key.toString("hex")}`;

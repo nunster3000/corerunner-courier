@@ -1,4 +1,9 @@
-import React, { useState } from "react";
+import {
+  passwordRequirements,
+  validNewPassword,
+  passwordGuidance,
+} from "../shared/password-policy.js";
+import React, { useState, useId } from "react";
 import { api } from "./api.js";
 import AddressInput from "./AddressInput.jsx";
 export default function AccountAccess({
@@ -18,11 +23,19 @@ export default function AccountAccess({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const register = mode === "register";
+  const requirementsId = useId();
+  const requirements = passwordRequirements(password);
+  const passwordValid = validNewPassword(password);
+  const passwordsMatch = password.length > 0 && password === confirmation;
   const update = (key, value) => setValues((v) => ({ ...v, [key]: value }));
   async function submit(e) {
     e.preventDefault();
     e.stopPropagation();
     if (busy) return;
+    if (register && !passwordValid) {
+      setError(passwordGuidance);
+      return;
+    }
     if (register && password !== confirmation) {
       setError("Passwords do not match.");
       return;
@@ -100,7 +113,8 @@ export default function AccountAccess({
           <input
             type="password"
             required
-            minLength={register ? 12 : 1}
+            minLength={register ? 8 : 1}
+            aria-describedby={register ? requirementsId : undefined}
             maxLength={128}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -109,9 +123,26 @@ export default function AccountAccess({
         </label>
         {register && (
           <>
-            <small>
-              Use 12–128 characters. Keep your password out of chat.
-            </small>
+            <div id={requirementsId} className="password-requirements">
+              <p role="status" aria-live="polite">
+                {requirements.filter((rule) => rule.met).length} of 4 password
+                requirements met
+              </p>
+              <ul aria-label="Password requirements">
+                {requirements.map((rule) => (
+                  <li key={rule.id} className={rule.met ? "met" : ""}>
+                    <span aria-hidden="true">{rule.met ? "✓" : "○"}</span>
+                    <span className="sr-only">
+                      {rule.met ? "Met: " : "Not met: "}
+                    </span>
+                    {rule.label}
+                  </li>
+                ))}
+              </ul>
+              <small>
+                Up to 128 characters. Spaces do not count as special characters.
+              </small>
+            </div>
             <label className="field">
               Confirm password
               <input
@@ -123,6 +154,16 @@ export default function AccountAccess({
                 autoComplete="new-password"
               />
             </label>
+            {confirmation && (
+              <p
+                className={passwordsMatch ? "password-match" : "muted"}
+                role="status"
+              >
+                {passwordsMatch
+                  ? "✓ Passwords match"
+                  : "Passwords do not match yet"}
+              </p>
+            )}
           </>
         )}
         {error && (
@@ -130,7 +171,11 @@ export default function AccountAccess({
             {error}
           </p>
         )}
-        <button className="button" disabled={busy} type="submit">
+        <button
+          className="button"
+          disabled={busy || (register && (!passwordValid || !passwordsMatch))}
+          type="submit"
+        >
           {busy ? "Please wait…" : register ? "Create account" : "Log in"}
         </button>
       </form>
