@@ -1,3 +1,4 @@
+import { installGroceries, requireCurrentReadiness } from "./groceries.js";
 import { installCorey } from "./corey.js";
 import express from "express";
 import { randomBytes, randomUUID, createHash, randomInt } from "node:crypto";
@@ -193,6 +194,29 @@ export function createApp({
         "SELECT kind,amount,created FROM payments WHERE booking_id=? ORDER BY id",
       )
       .all(b.id),
+  });
+  installGroceries(app, {
+    db,
+    auth,
+    staff,
+    read,
+    owned,
+    save,
+    present,
+    event,
+    notify,
+    canRead: (req, b) => {
+      const cs = cookies(req);
+      const u = db
+        .prepare("SELECT user_id FROM sessions WHERE token=? AND expires>?")
+        .get(hash(cs.cr_session), Date.now());
+      return (
+        u?.user_id === b.userId ||
+        !!db
+          .prepare("SELECT 1 FROM staff_sessions WHERE token=? AND expires>?")
+          .get(hash(cs.cr_staff), Date.now())
+      );
+    },
   });
   app.get("/api/health", (req, res) =>
     res.json({ ok: true, mode: demo ? "local-demo" : "disabled" }),
@@ -466,6 +490,7 @@ export function createApp({
             ? "Store readiness must be reviewed before dispatch."
             : "Only confirmed, unassigned deliveries can be assigned.",
         );
+      requireCurrentReadiness(b);
       const c = db
         .prepare("SELECT * FROM couriers WHERE id=?")
         .get(String(req.body.courierId));

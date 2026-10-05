@@ -736,3 +736,187 @@ test("Corey defaults to a local scripted guide even with an API key present", as
     else process.env.OPENAI_API_KEY = before;
   }
 });
+
+async function groceryUpload(c, id, overrides = {}, key = randomUUID()) {
+  const image =
+    "data:image/png;base64," +
+    (
+      await sharp({
+        create: { width: 80, height: 80, channels: 3, background: "#2450d8" },
+      })
+        .png()
+        .toBuffer()
+    ).toString("base64");
+  return c(
+    `/bookings/${id}/readiness`,
+    {
+      store: "Demo Market",
+      orderReference: "DEMO-1042",
+      pickupDate: new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date()),
+      image,
+      ...overrides,
+    },
+    { "Idempotency-Key": key },
+  );
+}
+const approveEvidence = (id) => ({
+  evidenceId: id,
+  decision: "approved",
+  readyShown: true,
+  prepaidShown: true,
+  dateMatches: true,
+  orderMatches: true,
+});
+test("grocery evidence is sender-owned, private, and only reviewed by dispatch", async (t) => {
+  const { client, db } = await fixture(t);
+  const sender = client(),
+    other = client(),
+    staff = client();
+  await login(sender);
+  await login(other, "other@example.com");
+  const b = await book(sender, { item: "Groceries" });
+  assert.equal((await groceryUpload(other, b.id)).status, 404);
+  assert.equal(
+    (
+      await groceryUpload(sender, b.id, {
+        image: "data:image/png;base64,bm90YW5pbWFnZQ==",
+      })
+    ).status,
+    400,
+  );
+  const key = randomUUID(),
+    r = await groceryUpload(sender, b.id, {}, key);
+  assert.equal(r.status, 201);
+  const id = r.body.booking.readiness.id;
+  assert.equal((await groceryUpload(sender, b.id, {}, key)).body.reused, true);
+  assert.equal(
+    db.prepare("SELECT count(*) n FROM grocery_evidence").get().n,
+    1,
+  );
+  assert.equal((await other(`/bookings/${b.id}/readiness/${id}`)).status, 404);
+  assert.equal(
+    (await sender(`/dispatch/${b.id}/readiness`, approveEvidence(id))).status,
+    403,
+  );
+  await staff("/demo/dispatch-session", {});
+  assert.equal(
+    (await staff(`/dispatch/${b.id}/assign`, { courierId: "cr-01" })).status,
+    409,
+  );
+  assert.equal(
+    (
+      await staff(`/dispatch/${b.id}/readiness`, {
+        ...approveEvidence(id),
+        readyShown: false,
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (await staff(`/dispatch/${b.id}/readiness`, approveEvidence(id))).body
+      .booking.status,
+    "confirmed",
+  );
+  assert.equal(
+    (await staff(`/dispatch/${b.id}/readiness`, approveEvidence(id))).body
+      .reused,
+    true,
+  );
+  assert.equal(
+    db
+      .prepare("SELECT count(*) n FROM events WHERE kind='readiness_approved'")
+      .get().n,
+    1,
+  );
+  assert.equal(
+    (await staff(`/dispatch/${b.id}/assign`, { courierId: "cr-01" })).status,
+    200,
+  );
+  assert.equal((await groceryUpload(sender, b.id)).status, 409);
+  const tracked = await sender(`/track/${b.trackingToken}`);
+  assert.equal(tracked.body.readiness, undefined);
+});
+test("rejected or replaced grocery evidence cannot dispatch; stale reviewers cannot approve replacements", async (t) => {
+  const { client } = await fixture(t);
+  const c = client();
+  await login(c);
+  await c("/demo/dispatch-session", {});
+  const b = await book(c, { item: "Groceries" });
+  const first = (await groceryUpload(c, b.id)).body.booking.readiness.id;
+  const rejected = await c(`/dispatch/${b.id}/readiness`, {
+    evidenceId: first,
+    decision: "rejected",
+    note: "Order is still preparing.",
+  });
+  assert.equal(rejected.body.booking.status, "awaiting_store_readiness");
+  assert.match(rejected.body.booking.readiness.note, /preparing/);
+  assert.equal(
+    (await c(`/dispatch/${b.id}/readiness`, approveEvidence(first))).status,
+    409,
+  );
+  const second = (await groceryUpload(c, b.id)).body.booking.readiness.id;
+  assert.equal(
+    (await c(`/dispatch/${b.id}/readiness`, approveEvidence(first))).status,
+    409,
+  );
+  assert.equal(
+    (await c(`/dispatch/${b.id}/readiness`, approveEvidence(second))).status,
+    200,
+  );
+  const third = await groceryUpload(c, b.id);
+  assert.equal(third.body.booking.status, "awaiting_store_readiness");
+  assert.equal(
+    (await c(`/dispatch/${b.id}/assign`, { courierId: "cr-01" })).status,
+    409,
+  );
+});
+test("grocery approvals require current pickup date and are rechecked at assignment with courier capacity", async (t) => {
+  const { client, db } = await fixture(t);
+  const c = client();
+  await login(c);
+  await c("/demo/dispatch-session", {});
+  const b = await book(c, { item: "Groceries" });
+  const old = (await groceryUpload(c, b.id, { pickupDate: "2020-01-01" })).body
+    .booking.readiness.id;
+  assert.equal(
+    (await c(`/dispatch/${b.id}/readiness`, approveEvidence(old))).status,
+    409,
+  );
+  const id = (await groceryUpload(c, b.id)).body.booking.readiness.id;
+  await c(`/dispatch/${b.id}/readiness`, approveEvidence(id));
+  const another = await book(c);
+  await c(`/dispatch/${another.id}/assign`, { courierId: "cr-01" });
+  assert.equal(
+    (await c(`/dispatch/${b.id}/assign`, { courierId: "cr-01" })).status,
+    409,
+  );
+  const payload = JSON.parse(
+    db.prepare("SELECT payload FROM bookings WHERE id=?").get(b.id).payload,
+  );
+  payload.readiness.pickupDate = "2020-01-01";
+  db.prepare("UPDATE bookings SET payload=? WHERE id=?").run(
+    JSON.stringify(payload),
+    b.id,
+  );
+  assert.equal(
+    (await c(`/dispatch/${b.id}/assign`, { courierId: "cr-02" })).status,
+    409,
+  );
+  const scheduled = await book(c, {
+    item: "Groceries",
+    service: "Scheduled",
+    date: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
+    window: "10 a.m.–1 p.m.",
+  });
+  const sid = (await groceryUpload(c, scheduled.id)).body.booking.readiness.id;
+  assert.equal(
+    (await c(`/dispatch/${scheduled.id}/readiness`, approveEvidence(sid)))
+      .status,
+    409,
+  );
+});

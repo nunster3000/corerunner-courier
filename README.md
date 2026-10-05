@@ -39,7 +39,7 @@ Browser tests use installed Google Chrome on macOS when available, otherwise Pla
 10. If nobody answers for an attended delivery, choose No one answered. A same-day return is scheduled immediately, with no waiting period. The courier can optionally choose Ask sender. In My deliveries, the sender explicitly authorizes unattended delivery; the courier refreshes and can then complete with a photo, without a return fee.
 11. Alternatively, choose Start return now. That closes the sender authorization window. At the sender's address, Record return handoff captures the receiving person's name, signature, and receipt consent. The backend records the disclosed return distance/time charge once, without another pickup or expedited fee. Completion releases the courier for a new assignment.
 
-There is no generic completion bypass in dispatch. Delivered and returned statuses require evidence from the assigned courier. Grocery bookings remain pending and cannot be assigned until the readiness-review feature is implemented. Grocery screenshot selection is still a local placeholder, separate from the implemented delivery-photo upload.
+There is no generic completion bypass in dispatch. Delivered and returned statuses require evidence from the assigned courier. Grocery bookings remain pending until a dispatcher reviews current store confirmation. In My deliveries, upload a screenshot or load a fictional ready/preparing sample. Demo dispatch displays the stored image and requires explicit checks for ready status, prepayment, pickup date, and matching store/order. Preparing or unclear evidence should be rejected with a reason; the sender can replace it. This is human review, not AI scanning or direct store verification.
 
 ## What is real and what is simulated
 
@@ -53,6 +53,7 @@ There is no generic completion bypass in dispatch. Delivered and returned status
 | Sender-only unattended authorization, immediate return scheduling, signed returns | No outgoing contact is sent; after-hours exceptions and other failure causes remain unfinished |
 | Pickup capture, return charge, ledger and event history | No real money movement, card processing, cancellation, or refunds yet |
 | Recipient tracking tokens with expiration | No phone GPS, maps, ETA or automatic live updates yet |
+| Grocery screenshot uploads, staff approval/rejection, resubmission and current-date assignment checks | Human review only; no OCR or store integration |
 | Customer-scoped notification history | Demo inbox includes sender and recipient copies; nothing is sent |
 
 This application binds to loopback and refuses a production start. Demo authentication can impersonate any sample email, so **use sample data and do not expose this server publicly**. This is intentional for a local portfolio walkthrough; it is not an authentication system suitable for a deployed service. Public deployment requires a real email provider, stronger staff identity, token delivery, operational authorization, abuse controls, and a production hosting configuration.
@@ -76,6 +77,12 @@ The demo adapter uses $5 pickup, $1.25 per fixture mile, $0.20 per fixture minut
 Demo city matching supports Atlanta, Decatur, Marietta, Alpharetta, Lawrenceville, and Peachtree City. Real polygons, geocoding, cutoff enforcement, capacity scheduling, vehicle constraints, dimensions, multiple packages, cold-item handling, and holiday hours remain open. Scheduled dates must not be in the past, but an offered window does not assert live availability. One active delivery per courier conservatively reserves return capacity; it is not optimized scheduling.
 
 The implemented return branch models recipient unavailability only. Other failure reasons, company-caused returns, after-hours exceptions, and unavailable senders require further work. A same-day due date is recorded in Atlanta time, but this is not an automated feasibility or scheduling guarantee. The initial return-proof implementation uses a captured signature; unattended returns and alternative return-PIN policies are not yet implemented.
+
+## Grocery readiness
+
+Evidence is stored as normalized WebP in SQLite and accessible only to the booking sender or a demo dispatcher. Uploads use the existing 4 MB image validation, metadata stripping, and 24-megapixel limit. Original filenames are not served. A booking allows up to ten uploads; idempotency keys prevent retry duplicates. Replacements invalidate previous approval. Review actions must reference the latest evidence, and completed reviews cannot be silently reversed.
+
+Approval requires evidence dated today in Atlanta. Scheduled grocery deliveries can be approved and assigned only on their scheduled delivery date in this initial flow. Assignment rechecks evidence date and courier capacity, including the existing return reservation. Approval does not guarantee a delivery window or route feasibility; full scheduling remains future work. No grocery evidence can be replaced after courier assignment. Expired assigned orders and other operational exceptions still need a future staff exception flow.
 
 ## Proof and authorization rules
 

@@ -1,3 +1,4 @@
+import GroceryReadiness from "./GroceryReadiness";
 import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -105,7 +106,8 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
               Local-only role switch with sample couriers. Manual assignment
               reserves one courier for the delivery and its possible return.
               Open Demo courier to record PIN, signature, or photo proof. Live
-              scheduling and grocery readiness review are not connected yet.
+              scheduling is not connected yet. Grocery evidence is reviewed
+              below.
             </p>
             {!ready && (
               <button
@@ -226,12 +228,12 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
                 </div>
               </dl>
             </div>
-            {b.status === "awaiting_store_readiness" && (
-              <p className="grocery-note">
-                Dispatch blocked: store readiness evidence has not been
-                reviewed. A preparing order or an uploaded filename never counts
-                as approval.
-              </p>
+            {b.delivery.item === "Groceries" && (
+              <GroceryReadiness
+                booking={b}
+                dispatch={mode === "dispatch"}
+                onChange={load}
+              />
             )}
             <details>
               <summary>Activity and simulated receipt</summary>

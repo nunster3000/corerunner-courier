@@ -19,6 +19,7 @@ export function openDatabase(path) {
  CREATE TABLE IF NOT EXISTS courier_sessions(token TEXT PRIMARY KEY,courier_id TEXT NOT NULL REFERENCES couriers(id),expires INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS handoff_codes(booking_id TEXT PRIMARY KEY REFERENCES bookings(id),code_hash TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,blocked_until INTEGER NOT NULL DEFAULT 0,used INTEGER NOT NULL DEFAULT 0);
  CREATE TABLE IF NOT EXISTS proofs(id TEXT PRIMARY KEY,booking_id TEXT NOT NULL REFERENCES bookings(id),leg TEXT NOT NULL,method TEXT NOT NULL,actor TEXT NOT NULL,created TEXT NOT NULL,payload TEXT NOT NULL,image BLOB,request_key TEXT NOT NULL,UNIQUE(booking_id,leg),UNIQUE(booking_id,request_key));
+ CREATE TABLE IF NOT EXISTS grocery_evidence(id TEXT PRIMARY KEY,booking_id TEXT NOT NULL REFERENCES bookings(id),request_key TEXT NOT NULL,payload TEXT NOT NULL,image BLOB NOT NULL,UNIQUE(booking_id,request_key));
  CREATE TABLE IF NOT EXISTS tracking(token TEXT PRIMARY KEY,booking_id TEXT UNIQUE NOT NULL REFERENCES bookings(id),expires INTEGER NOT NULL);
  `);
   const seed = db.prepare("INSERT OR IGNORE INTO couriers VALUES(?,?,?)");

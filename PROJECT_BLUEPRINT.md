@@ -206,7 +206,7 @@ Backend requirements include role-based access, valid transition checks, duplica
 | Email and verification | Demo inbox with backend-generated links; not proof of real mailbox ownership |
 | Tracking | Clearly labeled simulated trips plus a real phone-location test path |
 | Corey | Scripted local demo by default. Optional AI adapter is disabled and reserved for a future owner’s configuration. |
-| Grocery evidence | Screenshot extraction and review; no claim of direct store verification |
+| Grocery evidence | Implemented screenshot upload, human review, rejection/resubmission and current-date dispatch checks; no AI extraction or direct store verification |
 
 A future commercial deployment must replace simulated verification, payment, and notification integrations and validate background tracking on supported devices. Configurable branding and operational rules should aid resale. Selling a single-operator application versus licensing to multiple isolated companies remains an open business decision; multi-company SaaS is not part of the current commitment.
 

@@ -230,7 +230,6 @@ function App() {
     [verified, setVerified] = useState(false),
     [inbox, setInbox] = useState(false),
     [done, setDone] = useState(false),
-    [file, setFile] = useState(""),
     [menu, setMenu] = useState(false);
   const [user, setUser] = useState(null),
     [quote, setQuote] = useState(null),
@@ -813,7 +812,7 @@ function App() {
                 </div>
                 <p>
                   {data.item === "Groceries"
-                    ? "Grocery dispatch is blocked until your store readiness proof is accepted. Readiness review is not connected yet."
+                    ? "Open My deliveries to upload your store pickup confirmation. Demo dispatch reviews it before a courier can be assigned."
                     : "Your simulated payment is authorized. Dispatch can assign an available demo courier, and confirmation messages are saved in your demo inbox."}
                 </p>
                 <button
@@ -993,20 +992,11 @@ function App() {
                                 screen. Preparing orders are not eligible for
                                 dispatch.
                               </p>
-                              <label className="file-label">
-                                Readiness screenshot
-                                <input
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/webp"
-                                  onChange={(e) =>
-                                    setFile(e.target.files?.[0]?.name || "")
-                                  }
-                                />
-                              </label>
                               <small>
-                                {file
-                                  ? `${file} selected. Review is not connected in this preview.`
-                                  : "You can continue with readiness pending. No dispatch until proof is accepted."}
+                                After booking, upload the confirmation in My
+                                deliveries. You can try a fictional ready or
+                                preparing screen. Dispatch stays blocked until a
+                                reviewer approves current evidence.
                               </small>
                             </div>
                           )}
@@ -1150,8 +1140,9 @@ function App() {
                           </dl>
                           {data.item === "Groceries" && (
                             <p className="grocery-note">
-                              Readiness review pending. Screenshot selection is
-                              not approval; dispatch remains blocked.
+                              Readiness review pending. Upload confirmation in
+                              My deliveries after booking; dispatch remains
+                              blocked until approval.
                             </p>
                           )}
                           <div className="quote-card">
