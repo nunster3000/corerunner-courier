@@ -1,3 +1,5 @@
+import AddressInput from "./AddressInput.jsx";
+import { useServicePrices } from "./ServicePrices.jsx";
 import { operator, loadOperator } from "./operator";
 import DemoStudio, { DemoGuide } from "./DemoStudio";
 import { WindowAvailability } from "./ScheduleBoard";
@@ -246,6 +248,7 @@ function App() {
     [accepted, setAccepted] = useState(false),
     [paymentOutcome, setPaymentOutcome] = useState("approve");
   const [activeDemo, setActiveDemo] = useState(null);
+  const servicePrices = useServicePrices(data.pickup, data.dropoff, step === 3);
   const navigateDemo = (destination) => {
     setPage(destination);
     setChat(false);
@@ -448,6 +451,21 @@ function App() {
       );
       return;
     }
+    if (step === 1) {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await api("/delivery-options", {
+          method: "POST",
+          body: { pickup: data.pickup, dropoff: data.dropoff },
+        });
+      } catch (e) {
+        setError(e.message);
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
     if (step === 2 && (Number(data.weight) <= 0 || Number(data.weight) > 50)) {
       setError("Each package must weigh between 0 and 50 pounds, excluding 0.");
       return;
@@ -456,28 +474,37 @@ function App() {
     setStep((s) => Math.min(s + 1, 4));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const field = (key, label, type = "text", placeholder = "") => (
-    <label className="field">
-      {label}
-      <input
-        type={type}
+  const field = (key, label, type = "text", placeholder = "") =>
+    ["pickup", "dropoff"].includes(key) ? (
+      <AddressInput
+        label={label}
         name={key}
         value={data[key]}
-        onChange={(e) => {
-          update(key, e.target.value);
-          if (key === "email") setVerified(false);
-        }}
-        required
-        placeholder={placeholder}
-        {...(key === "phone"
-          ? {
-              pattern: "[0-9+\\(\\) .\\-]{10,}",
-              title: "Enter your phone number with area code",
-            }
-          : {})}
+        onChange={(value) => update(key, value)}
+        placeholder={placeholder || undefined}
       />
-    </label>
-  );
+    ) : (
+      <label className="field">
+        {label}
+        <input
+          type={type}
+          name={key}
+          value={data[key]}
+          onChange={(e) => {
+            update(key, e.target.value);
+            if (key === "email") setVerified(false);
+          }}
+          required
+          placeholder={placeholder}
+          {...(key === "phone"
+            ? {
+                pattern: "[0-9+\\(\\) .\\-]{10,}",
+                title: "Enter your phone number with area code",
+              }
+            : {})}
+        />
+      </label>
+    );
   return (
     <>
       <a className="skip-link" href="#main">
@@ -1116,10 +1143,30 @@ function App() {
                                 <span>
                                   <strong>{name}</strong>
                                   <small>{copy}</small>
+                                  <strong className="service-price">
+                                    {servicePrices?.data?.options.find(
+                                      (option) => option.service === name,
+                                    )
+                                      ? money(
+                                          servicePrices.data.options.find(
+                                            (option) => option.service === name,
+                                          ).price.total,
+                                        )
+                                      : "Estimate pending"}
+                                  </strong>
                                 </span>
                               </label>
                             ))}
                           </div>
+                          {servicePrices?.error && (
+                            <p role="alert" className="error">
+                              {servicePrices.error}
+                            </p>
+                          )}
+                          <p className="muted">
+                            Estimated demo prices. Your final quote and
+                            scheduled availability are confirmed before booking.
+                          </p>
                           {data.service === "Scheduled" && (
                             <div className="fields">
                               <label className="field">

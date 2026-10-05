@@ -8,8 +8,20 @@ async function account(page) {
     .fill(`alex-${crypto.randomUUID()}@example.com`);
   await page.getByLabel("Phone number", { exact: true }).fill("4045550123");
   await page
-    .getByLabel("Default pickup address")
-    .fill("100 Sample Street, Atlanta, GA 30303");
+    .getByLabel("Default pickup address", { exact: true })
+    .fill("430 Pryor St. Atlanta, GA 30312");
+  await expect(
+    page.getByRole("option", { name: /430 Pryor St., Atlanta, GA 30312/ }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Default pickup address", { exact: true })
+    .press("ArrowDown");
+  await page
+    .getByLabel("Default pickup address", { exact: true })
+    .press("Enter");
+  await expect(
+    page.getByLabel("Default pickup address", { exact: true }),
+  ).toHaveValue("430 Pryor St., Atlanta, GA 30312");
   await page.getByRole("button", { name: "Demo inbox" }).click();
   await page
     .getByRole("button", { name: "Simulate email verification" })
@@ -36,6 +48,11 @@ test("booking requires verification, valid weight and preserves default handoff"
   ).toBeVisible();
   await page.getByLabel("Package weight in pounds").fill("12");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
+  for (const service of ["Same-day", "Expedited", "Scheduled"]) {
+    await expect(
+      page.getByRole("radio", { name: new RegExp(service + ".*\\$", "s") }),
+    ).toBeVisible();
+  }
   await page.getByRole("radio", { name: /Scheduled/ }).check();
   await page
     .getByLabel("Delivery date")

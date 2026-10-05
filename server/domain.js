@@ -39,6 +39,7 @@ export function profile(input) {
 }
 // Explicit demo fixtures, NOT geocoding or measured road distance. Replace this adapter before deployment.
 export function demoZone(address, settings = operator) {
+  address = String(address).normalize("NFKC").replace(/\s+/g, " ").trim();
   const z = [...settings.coverage.zones]
     .sort((a, b) => b[0].length - a[0].length)
     .find(([city]) => {
@@ -55,10 +56,31 @@ export function demoZone(address, settings = operator) {
     );
   return z;
 }
+export function formatAddress(value, label = "Address") {
+  const address = text(value, label)
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .replace(/\s*,\s*/g, ", ")
+    .trim();
+  let city;
+  try {
+    [city] = demoZone(address);
+  } catch (error) {
+    error.message = `${label}: ${error.message}`;
+    throw error;
+  }
+  const index = address.toLowerCase().lastIndexOf(city.toLowerCase());
+  const street = address.slice(0, index).replace(/[, ]+$/, "");
+  const suffix = address
+    .slice(index + city.length)
+    .replace(/^\s*,?\s*/, "")
+    .replace(/^ga\b/i, "GA");
+  return [street, city, suffix].filter(Boolean).join(", ");
+}
 export function delivery(input) {
   const d = {
-    pickup: text(input.pickup, "Pickup address"),
-    dropoff: text(input.dropoff, "Delivery address"),
+    pickup: formatAddress(input.pickup, "Pickup address"),
+    dropoff: formatAddress(input.dropoff, "Delivery address"),
     recipient: text(input.recipient, "Recipient", 100),
     recipientEmail: email(input.recipientEmail),
     item: text(input.item, "Package type", 60),

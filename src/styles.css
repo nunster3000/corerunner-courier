@@ -3021,3 +3021,81 @@ section[id] {
   font-size: 13px;
   line-height: 1.5;
 }
+
+.address-field {
+  position: relative;
+  min-width: 0;
+}
+.address-field > small {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+}
+.address-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  background: white;
+  color: #132344;
+  border: 1px solid #ccd5e6;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px #12234425;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.address-suggestions li {
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.address-suggestions li:hover,
+.address-suggestions li[aria-selected="true"] {
+  background: #edf2ff;
+}
+.address-suggestions strong,
+.address-suggestions small {
+  display: block;
+}
+.address-suggestions small {
+  font-size: 11px;
+  margin-top: 4px;
+  color: #58657b;
+}
+.chat-input .address-field {
+  flex: 1;
+}
+.chat-input .address-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.chat-input .address-suggestions {
+  top: auto;
+  bottom: 100%;
+}
+.service-price {
+  display: block;
+  margin-top: 8px;
+  color: #2454cd;
+}
+.service-prices button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0;
+  border: 1px solid #ccd5e6;
+  background: white;
+  color: #163883;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.service-prices small {
+  display: block;
+}

@@ -141,7 +141,7 @@ test("scripted Corey completes booking with no AI transport or API key", async (
     "Alex Mock",
     `mock-${crypto.randomUUID()}@example.com`,
     "4045550123",
-    "100 Sample Street, Atlanta 30303",
+    "430 Pryor St. Atlanta, GA 30312",
     "200 Example Lane, Decatur 30030",
     "Jamie Mock",
     "jamie@example.com",
@@ -169,4 +169,37 @@ test("scripted Corey completes booking with no AI transport or API key", async (
   await expect(
     page.getByText("Booking saved ·", { exact: false }),
   ).toBeVisible();
+});
+
+test("Corey selects a formatted address suggestion and recovers an incomplete address", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Book with Corey", exact: true })
+    .click();
+  const reply = page.getByLabel("Reply to Corey", { exact: true });
+  await reply.fill("pickup: 430 Pryor St.");
+  await page.getByRole("button", { name: "Send reply" }).click();
+  await expect(
+    page.getByText("Please include the city in the pickup address", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await reply.fill("430 Pryor St. Atlanta, GA 30312");
+  await page
+    .getByRole("option", { name: /430 Pryor St., Atlanta, GA 30312/ })
+    .click();
+  await expect(
+    page.getByText("pickup: 430 Pryor St., Atlanta, GA 30312", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("What’s your full name?", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Prefer a form? Continue there" })
+    .click();
+  await expect(
+    page.getByLabel("Default pickup address", { exact: true }),
+  ).toHaveValue("430 Pryor St., Atlanta, GA 30312");
 });

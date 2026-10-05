@@ -1,5 +1,5 @@
 import { operator } from "./operator.js";
-import { email, text, fail } from "./domain.js";
+import { email, text, fail, formatAddress } from "./domain.js";
 const prompts = {
   name: "What’s your full name?",
   email: "What email should we use for your demo account?",
@@ -22,6 +22,7 @@ export function demoReply(s, message, user, createQuote, listBookings) {
     draft: s.draft,
     quote: s.quote,
     verified: !!user,
+    pending: s.pending || null,
   });
   if (/^(help|policies|what can you do)\??$/i.test(value))
     return result(
@@ -69,6 +70,17 @@ export function demoReply(s, message, user, createQuote, listBookings) {
     let answer = correction ? correction[2] : value;
     try {
       answer = text(answer, field, 300);
+      if (["pickup", "dropoff"].includes(field)) {
+        s.pending = field;
+        s.quote = null;
+        try {
+          answer = formatAddress(answer);
+        } catch {
+          return result(
+            `Please include the city in the ${field === "pickup" ? "pickup" : "delivery"} address, or choose a demo address suggestion below. You can reply with the corrected address directly.`,
+          );
+        }
+      }
       if (field.toLowerCase().includes("email")) answer = email(answer);
       if (field === "phone" && answer.replace(/\D/g, "").length < 10)
         fail(400, "Enter a phone number with at least 10 digits.");
@@ -107,6 +119,18 @@ export function demoReply(s, message, user, createQuote, listBookings) {
     return result(
       "This mock assistant uses a guided conversation. Say “start” to begin, “quote” to review, or “help” for supported questions.",
     );
+  for (const addressField of ["pickup", "dropoff"]) {
+    if (!s.draft[addressField]) continue;
+    try {
+      s.draft[addressField] = formatAddress(s.draft[addressField]);
+    } catch {
+      s.pending = addressField;
+      s.quote = null;
+      return result(
+        `Let’s fix the ${addressField === "pickup" ? "pickup" : "delivery"} address: include the service-area city or choose a demo suggestion below. Reply with the corrected address directly.`,
+      );
+    }
+  }
   const required = [
     ...(!user ? ["name", "email", "phone"] : []),
     "pickup",

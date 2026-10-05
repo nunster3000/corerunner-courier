@@ -1,3 +1,5 @@
+import AddressInput from "./AddressInput.jsx";
+import ServicePrices from "./ServicePrices.jsx";
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Send, Sparkles, X } from "lucide-react";
 import { api, money } from "./api.js";
@@ -11,6 +13,7 @@ export default function CoreyChat({
   user,
   onUser,
 }) {
+  const [pending, setPending] = useState(null);
   const [mode, setMode] = useState("mock");
   const [available, setAvailable] = useState(null),
     [messages, setMessages] = useState([]),
@@ -45,6 +48,7 @@ export default function CoreyChat({
     if (previousUser.current && previousUser.current !== user?.id) {
       setMessages([]);
       setDraft(null);
+      setPending(null);
       setQuote(null);
       setBooking(null);
       setVerification(null);
@@ -65,7 +69,9 @@ export default function CoreyChat({
   };
   const send = (e) => {
     e.preventDefault();
-    const message = input.trim();
+    sendMessage(input.trim());
+  };
+  const sendMessage = (message) => {
     if (!message || busy) return;
     run(async () => {
       const result = await api("/corey/message", {
@@ -79,6 +85,7 @@ export default function CoreyChat({
       ]);
       setInput("");
       setDraft(result.draft);
+      setPending(result.pending || null);
       onDraft(result.draft);
       setQuote(result.quote);
       setAccepted(false);
@@ -290,6 +297,18 @@ export default function CoreyChat({
             <a href={`/?track=${booking.trackingToken}`}>Track this delivery</a>
           </div>
         )}
+        {draft?.pickup &&
+          draft?.dropoff &&
+          !["pickup", "dropoff"].includes(pending) &&
+          (draft.weight || pending === "service") &&
+          !booking && (
+            <ServicePrices
+              pickup={draft.pickup}
+              dropoff={draft.dropoff}
+              disabled={busy}
+              onSelect={(service) => sendMessage(`service: ${service}`)}
+            />
+          )}
         {busy && <div className="bubble">Corey is working…</div>}
         {error && (
           <p className="error" role="alert">
@@ -299,18 +318,31 @@ export default function CoreyChat({
         <div ref={end} />
       </div>
       <form className="chat-input" onSubmit={send}>
-        <label className="sr-only" htmlFor="chat-reply">
-          Reply to Corey
-        </label>
-        <input
-          id="chat-reply"
-          value={input}
-          maxLength={2000}
-          disabled={!available || busy}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Tell Corey about your delivery…"
-          autoComplete="off"
-        />
+        {["pickup", "dropoff"].includes(pending) ? (
+          <AddressInput
+            label="Reply to Corey"
+            value={input}
+            onChange={setInput}
+            required={false}
+            disabled={!available || busy}
+            onChoose={(address) => sendMessage(`${pending}: ${address}`)}
+          />
+        ) : (
+          <>
+            <label className="sr-only" htmlFor="chat-reply">
+              Reply to Corey
+            </label>
+            <input
+              id="chat-reply"
+              value={input}
+              maxLength={2000}
+              disabled={!available || busy}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Tell Corey about your delivery…"
+              autoComplete="off"
+            />
+          </>
+        )}
         <button
           className="icon-button"
           aria-label="Send reply"
@@ -331,6 +363,7 @@ export default function CoreyChat({
             await api("/corey/reset", { method: "POST", body: {} });
             setMessages([]);
             setDraft(null);
+            setPending(null);
             setQuote(null);
             setBooking(null);
             setAccepted(false);

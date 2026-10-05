@@ -1,3 +1,4 @@
+import { addressSuggestions, deliveryOptions } from "./addresses.js";
 import { operator } from "./operator.js";
 import { installWalkthrough } from "./walkthrough.js";
 import { scheduler, easternClock } from "./scheduling.js";
@@ -101,6 +102,12 @@ export function createApp({
     next();
   });
   app.get("/api/operator", (req, res) => res.json({ ...operator, hostedDemo }));
+  app.get("/api/addresses/suggest", (req, res) =>
+    res.json({ suggestions: addressSuggestions(req.query.q) }),
+  );
+  app.post("/api/delivery-options", (req, res) =>
+    res.json(deliveryOptions(req.body)),
+  );
   const auth = (req, res, next) => {
     const s = db
       .prepare(
