@@ -1,3 +1,4 @@
+import { atlantaDate } from "./domain.js";
 import { openAIProvider } from "./corey.js";
 import { createApp } from "./app.js";
 try {
@@ -12,6 +13,9 @@ if (process.env.NODE_ENV === "production")
 const { app, db } = createApp({
   dbPath: process.env.DB_PATH || "data/corerunner.sqlite",
   demo: true,
+  ...(process.env.TEST_PREVIEW
+    ? { scheduleNow: () => new Date(atlantaDate() + "T16:00:00Z") }
+    : {}),
   coreyMode: process.env.COREY_MODE === "live" ? "live" : "mock",
   aiProvider: process.env.COREY_MODE === "live" ? openAIProvider() : null,
 });

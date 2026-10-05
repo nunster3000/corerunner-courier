@@ -1,3 +1,4 @@
+import { WindowAvailability } from "./ScheduleBoard";
 import CoreyChat from "./CoreyChat.jsx";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -1084,11 +1085,19 @@ function App() {
                               </label>
                             </div>
                           )}
+                          {data.service === "Scheduled" && (
+                            <WindowAvailability
+                              date={data.date}
+                              selected={data.window}
+                            />
+                          )}
                           <p className="info-note">
                             <Clock3 size={18} /> Demo quotes use illustrative
-                            city-center routes. Live availability, cutoff
-                            enforcement, and arrival estimates are not
-                            connected.
+                            city-center routes. Scheduled windows reserve sample
+                            courier capacity and return time. Same-day and
+                            expedited requests enter the dispatch queue;
+                            assignment checks shifts and scheduled commitments.
+                            No live arrival estimates.
                           </p>
                         </>
                       )}
@@ -1143,6 +1152,15 @@ function App() {
                               Readiness review pending. Upload confirmation in
                               My deliveries after booking; dispatch remains
                               blocked until approval.
+                            </p>
+                          )}
+                          {quote?.schedule && (
+                            <p className="info-note">
+                              Scheduled capacity will be reserved at
+                              confirmation, including{" "}
+                              {quote.schedule.returnReserveMinutes} minutes for
+                              a possible return. Window: {quote.schedule.date} ·{" "}
+                              {quote.schedule.window} Eastern.
                             </p>
                           )}
                           <div className="quote-card">

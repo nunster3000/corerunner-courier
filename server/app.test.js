@@ -20,7 +20,19 @@ const sample = {
   unattended: false,
 };
 async function fixture(t, options = {}) {
-  const { app, db } = createApp({ dbPath: ":memory:", ...options });
+  const { app, db } = createApp({
+    dbPath: ":memory:",
+    scheduleNow: () =>
+      new Date(
+        new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/New_York",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date()) + "T16:00:00Z",
+      ),
+    ...options,
+  });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
   t.after(async () => {
@@ -1279,5 +1291,142 @@ test("company failure holds assignment until recovery and waives return fee with
       )
       .get().n,
     0,
+  );
+});
+
+test("scheduled confirmations reserve capacity atomically and cancellation releases it", async (t) => {
+  const { client, db } = await fixture(t);
+  const c = client();
+  await login(c);
+  const d = {
+    ...sample,
+    service: "Scheduled",
+    date: "2099-06-02",
+    window: "10 a.m.–1 p.m.",
+  };
+  const quotes = [];
+  for (let i = 0; i < 4; i++) quotes.push((await c("/quotes", d)).body);
+  assert.equal(
+    (await c("/availability?date=2099-06-02")).body.windows[1].available,
+    3,
+  );
+  const results = await Promise.all(
+    quotes.map((q) =>
+      c(
+        "/bookings",
+        { quoteId: q.id, accepted: true },
+        { "Idempotency-Key": randomUUID() },
+      ),
+    ),
+  );
+  assert.equal(results.filter((r) => r.status === 201).length, 3);
+  assert.equal(results.filter((r) => r.status === 409).length, 1);
+  const reserved = results
+    .filter((r) => r.status === 201)
+    .map((r) => r.body.booking);
+  assert.equal(new Set(reserved.map((b) => b.schedule.courierId)).size, 3);
+  assert.equal(
+    (await c("/availability?date=2099-06-02")).body.windows[1].available,
+    0,
+  );
+  const q = (await cancelPreview(c, reserved[0])).body;
+  await cancelConfirm(c, reserved[0], q);
+  assert.equal(
+    (await c("/availability?date=2099-06-02")).body.windows[1].available,
+    1,
+  );
+  assert.equal(
+    db
+      .prepare("SELECT count(*) n FROM payments WHERE kind='authorization'")
+      .get().n,
+    3,
+  );
+});
+test("shift changes require staff and preserve booked delivery and return windows", async (t) => {
+  const { client } = await fixture(t);
+  const c = client();
+  await login(c);
+  const b = await book(c, {
+    service: "Scheduled",
+    date: "2099-06-03",
+    window: "1–4 p.m.",
+  });
+  const path = `/dispatch/shifts/${b.schedule.courierId}`,
+    body = { date: "2099-06-03", onDuty: false, startHour: 8, endHour: 20 };
+  assert.equal((await c(path, body)).status, 403);
+  await c("/demo/dispatch-session", {});
+  assert.equal((await c(path, body)).status, 409);
+  assert.equal(
+    (await c(path, { ...body, onDuty: true, endHour: 15 })).status,
+    409,
+  );
+  assert.equal((await c("/dispatch/shifts/cr-02", body)).status, 200);
+  assert.equal(
+    (await c("/availability?date=2099-06-03")).body.windows[2].available,
+    1,
+  );
+  const publicView = (await c("/availability?date=2099-06-03")).body;
+  assert.equal(publicView.couriers, undefined);
+});
+test("schedule enforces route fit, date boundaries and protects planned slots from same-day assignment", async (t) => {
+  let clock = new Date("2099-06-01T16:00:00Z");
+  const { client } = await fixture(t, { scheduleNow: () => clock });
+  const c = client();
+  await login(c);
+  await c("/demo/dispatch-session", {});
+  await c("/demo/courier-session", { courierId: "cr-01" });
+  assert.equal(
+    (
+      await c("/quotes", {
+        ...sample,
+        service: "Scheduled",
+        date: "2099-06-01",
+        window: "8–10 a.m.",
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await c("/quotes", {
+        ...sample,
+        service: "Scheduled",
+        date: "2099-06-02",
+        window: "8–10 a.m.",
+        dropoff: "100 Sample Road, Peachtree City 30269",
+      })
+    ).status,
+    409,
+  );
+  const b = await book(c, {
+    service: "Scheduled",
+    date: "2099-06-02",
+    window: "1–4 p.m.",
+  });
+  assert.equal(
+    (await c(`/dispatch/${b.id}/assign`, { courierId: "cr-01" })).status,
+    409,
+  );
+  clock = new Date("2099-06-02T16:00:00Z");
+  const immediate = await book(c);
+  assert.equal(
+    (await c(`/dispatch/${immediate.id}/assign`, { courierId: "cr-01" }))
+      .status,
+    409,
+  );
+  assert.equal(
+    (await c(`/dispatch/${b.id}/assign`, { courierId: "cr-01" })).status,
+    200,
+  );
+  assert.equal(
+    (await c(`/courier/${b.id}/advance`, { status: "heading_to_pickup" }))
+      .status,
+    409,
+  );
+  clock = new Date("2099-06-02T17:05:00Z");
+  assert.equal(
+    (await c(`/courier/${b.id}/advance`, { status: "heading_to_pickup" }))
+      .status,
+    200,
   );
 });

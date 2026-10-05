@@ -1,3 +1,4 @@
+import ScheduleBoard from "./ScheduleBoard";
 import DeliveryExceptions from "./DeliveryExceptions";
 import TrackingRoute from "./TrackingRoute";
 import GroceryReadiness from "./GroceryReadiness";
@@ -107,9 +108,9 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
             <p>
               Local-only role switch with sample couriers. Manual assignment
               reserves one courier for the delivery and its possible return.
-              Open Demo courier to record PIN, signature, or photo proof. Live
-              scheduling is not connected yet. Grocery evidence is reviewed
-              below.
+              Open Demo courier to record PIN, signature, or photo proof.
+              Scheduled windows and shifts use sample capacity. Grocery evidence
+              is reviewed below.
             </p>
             {!ready && (
               <button
@@ -141,6 +142,7 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
           {error}
         </p>
       )}
+      {mode === "dispatch" && ready && <ScheduleBoard revision={bookings} />}
       {mode === "dispatch" && ready && (
         <div className="roster">
           {couriers.map((c) => {
@@ -230,6 +232,13 @@ export default function DeliveryHub({ mode, onBack, onBook }) {
                 </div>
               </dl>
             </div>
+            {b.schedule && (
+              <p className="info-note">
+                Reserved: {b.schedule.date} · {b.schedule.window} Eastern.
+                Includes {b.schedule.returnReserveMinutes} minutes for a
+                possible return.
+              </p>
+            )}
             {b.delivery.item === "Groceries" && (
               <GroceryReadiness
                 booking={b}

@@ -250,6 +250,13 @@ export default function CoreyChat({
               original charge is retained. No extra return fee for a
               CoreRunner-caused failure.
             </p>
+            {quote.schedule && (
+              <p>
+                This window includes {quote.schedule.returnReserveMinutes}{" "}
+                minutes for a possible return. Confirmation reserves capacity;
+                the quote alone does not hold it.
+              </p>
+            )}
             {quote.delivery.item === "Groceries" && (
               <p>Store readiness review is required before dispatch.</p>
             )}

@@ -2783,3 +2783,76 @@ section[id] {
 .exception-panel .checkbox-label {
   margin: 14px 0;
 }
+
+.schedule-board {
+  margin: 24px 0;
+  padding: 20px;
+  background: #f3f6ff;
+  border: 1px solid #dce4fa;
+  border-radius: 16px;
+}
+.schedule-board summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+.schedule-board label:not(.checkbox-label) {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  margin: 12px 0;
+}
+.schedule-board input:not([type="checkbox"]) {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: white;
+  font: inherit;
+}
+.shift-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+.shift-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+  font-size: 13px;
+}
+.shift-card fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.shift-times {
+  display: flex;
+  gap: 10px;
+}
+.shift-times label {
+  min-width: 0;
+  flex: 1;
+}
+.shift-card li {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.shift-card ul {
+  padding-left: 16px;
+}
+.availability-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 18px 0;
+  font-size: 13px;
+}
+.availability-grid div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  background: white;
+  border-radius: 8px;
+}

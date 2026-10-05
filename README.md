@@ -48,7 +48,7 @@ There is no generic completion bypass in dispatch. Delivered and returned status
 | Accounts, expiring sessions, browser-bound single-use verification challenges | Email delivery and mailbox ownership verification are simulated |
 | Quotes, 15-minute expiry, accepted snapshot, duplicate-request protection | Rates are illustrative fixtures, not approved commercial prices |
 | Server validation of weight, service and date | City-name matching is a demo coverage check, not address validation |
-| Staff-gated dispatch API, courier-scoped sessions, approved roster, one active job per courier | Demo role entry grants local access; no production staff authentication or shift planning |
+| Staff-gated dispatch API, courier-scoped sessions, approved roster, one active job per courier | Demo role entry grants local access; no production staff authentication; shifts use the sample roster |
 | PIN verification, captured signatures, normalized delivery photos and proof history | The app records evidence; it does not independently establish signer identity or confirm photo contents |
 | Sender-only unattended authorization, immediate return scheduling, signed returns | No outgoing contact is sent; after-hours exceptions and other failure causes remain unfinished |
 | Pickup capture, return charge, ledger and event history | Cancellation previews, fee capture and authorization release are simulated; no real money movement or original-charge refunds |
@@ -74,9 +74,19 @@ Grocery image analysis, actual support-case submission, chat cancellation tools 
 
 The demo adapter uses $5 pickup, $1.25 per fixture mile, $0.20 per fixture minute, and an $8 expedited surcharge. It estimates distance from city centers with a multiplier and a 3-mile minimum; time is 2.5 minutes per fixture mile. These are explicit engineering fixtures to exercise quotes and receipts, not policy approval or measured driving routes. The displayed demo return price is locked to the accepted quote.
 
-Demo city matching supports Atlanta, Decatur, Marietta, Alpharetta, Lawrenceville, and Peachtree City. Real polygons, geocoding, cutoff enforcement, capacity scheduling, vehicle constraints, dimensions, multiple packages, cold-item handling, and holiday hours remain open. Scheduled dates must not be in the past, but an offered window does not assert live availability. One active delivery per courier conservatively reserves return capacity; it is not optimized scheduling.
+Demo city matching supports Atlanta, Decatur, Marietta, Alpharetta, Lawrenceville, and Peachtree City. Real polygons, geocoding, vehicle constraints, dimensions, multiple packages, cold-item handling, holiday hours, and optimized routing remain open. Scheduled capacity uses the sample roster and fixture travel times. It is not real-world availability or a measured ETA. One active delivery per courier preserves custody and return capacity.
 
 The return branch models recipient unavailability, sender cancellation after pickup, and staff-recorded company failures. Company failures can enter a custody/return hold with the courier assignment reserved. After-hours exceptions, reassignment, and unavailable senders still require further work. A same-day due date is recorded in Atlanta time, but this is not an automated feasibility or scheduling guarantee. The initial return-proof implementation uses a captured signature; unattended returns and alternative return-PIN policies are not yet implemented.
+
+## Delivery windows and courier shifts
+
+Scheduled quotes check available sample couriers but do not hold a slot. Confirmation transactionally reserves one courier for the entire selected window. The planning allowance is the fixture outbound travel time plus 15 minutes handling, then the same travel time plus 15 minutes for a possible return. A route that cannot fit that allowance is rejected. Confirmation rechecks capacity so simultaneous bookings cannot oversell a slot; cancelled or completed bookings release their reservation. Same-day and expedited bookings enter the unreserved dispatch queue, not a guaranteed time slot.
+
+Demo dispatch has a dated schedule board with shift editing. Defaults are 8 a.m.–8 p.m. Eastern for all three sample couriers. Existing scheduled reservations and active jobs prevent conflicting shift changes. Staff can assign a scheduled job only on its delivery date; pickup cannot begin before the reserved window. Assignment and pickup reject windows with insufficient remaining time. Assigning a different available courier updates the reservation. Grocery readiness approval remains a separate requirement.
+
+Same-day/expedited assignment requires the round-trip allowance to fit the courier’s current shift and avoid scheduled reservations. Active trips prevent another simultaneous assignment; unresolved return/exception jobs conservatively block additional capacity until resolved. This is a simple capacity planner, not dispatch optimization or a real traffic model. No automatic rebooking or missed-window recovery is implemented: dispatch must review these cases. Pre-existing scheduled records without a reservation are rechecked when assigned.
+
+All schedule dates/times use America/New_York, including daylight-saving changes. Automated API tests inject a clock; browser test servers use 16:00 UTC on the current Atlanta date via TEST_PREVIEW for repeatable daytime assignments. Normal local development uses the actual clock.
 
 ## Cancellation and company exceptions
 
@@ -96,7 +106,7 @@ Recipient tracking refreshes every five seconds while visible and supports manua
 
 Evidence is stored as normalized WebP in SQLite and accessible only to the booking sender or a demo dispatcher. Uploads use the existing 4 MB image validation, metadata stripping, and 24-megapixel limit. Original filenames are not served. A booking allows up to ten uploads; idempotency keys prevent retry duplicates. Replacements invalidate previous approval. Review actions must reference the latest evidence, and completed reviews cannot be silently reversed.
 
-Approval requires evidence dated today in Atlanta. Scheduled grocery deliveries can be approved and assigned only on their scheduled delivery date in this initial flow. Assignment rechecks evidence date and courier capacity, including the existing return reservation. Approval does not guarantee a delivery window or route feasibility; full scheduling remains future work. No grocery evidence can be replaced after courier assignment. Expired assigned orders and other operational exceptions still need a future staff exception flow.
+Approval requires evidence dated today in Atlanta. Scheduled grocery deliveries can be approved and assigned only on their scheduled delivery date in this initial flow. Assignment rechecks evidence date and courier capacity, including the existing return reservation. Approval is separate from scheduling; assignment rechecks the scheduled date, shift and remaining fixture travel/return time. It does not guarantee real-world route feasibility. No grocery evidence can be replaced after courier assignment. Expired assigned orders and other operational exceptions still need a future staff exception flow.
 
 ## Proof and authorization rules
 

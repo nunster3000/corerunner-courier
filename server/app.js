@@ -1,3 +1,4 @@
+import { scheduler, easternClock } from "./scheduling.js";
 import { installCancellations } from "./cancellations.js";
 import { syncSimulation, trackingView, changeSimulation } from "./tracking.js";
 import { installGroceries, requireCurrentReadiness } from "./groceries.js";
@@ -43,9 +44,11 @@ export function createApp({
   demo = true,
   aiProvider = null,
   coreyMode = "mock",
+  scheduleNow = () => new Date(),
 } = {}) {
   const app = express(),
     db = openDatabase(dbPath);
+  const scheduling = scheduler(db, scheduleNow);
   app.disable("x-powered-by");
   app.use((req, res, next) => {
     res.set("Cache-Control", "no-store");
@@ -325,6 +328,7 @@ export function createApp({
         id: randomUUID(),
         delivery: d,
         price: price(d),
+        schedule: scheduling.plan(d),
         expires: Date.now() + 15 * 60000,
       };
     db.prepare("INSERT INTO quotes VALUES(?,?,?,?)").run(
@@ -397,11 +401,13 @@ export function createApp({
         );
       const q = JSON.parse(row.payload);
       delivery(q.delivery);
+      const schedule = scheduling.plan(q.delivery);
       const b = {
         id: "CR-" + randomBytes(5).toString("hex").toUpperCase(),
         userId: req.user.id,
         quoteId: q.id,
         delivery: q.delivery,
+        schedule,
         price: q.price,
         status:
           q.delivery.item === "Groceries"
@@ -488,6 +494,23 @@ export function createApp({
     cookie(res, "cr_staff", token, 3600000);
     res.json({ simulated: true });
   });
+  app.get("/api/availability", (req, res) =>
+    res.json(
+      scheduling.availability(
+        String(req.query.date || easternClock(scheduleNow()).date),
+      ),
+    ),
+  );
+  app.get("/api/dispatch/schedule", staff, (req, res) =>
+    res.json(
+      scheduling.board(
+        String(req.query.date || easternClock(scheduleNow()).date),
+      ),
+    ),
+  );
+  app.post("/api/dispatch/shifts/:courierId", staff, (req, res) =>
+    res.json(scheduling.updateShift(req.params.courierId, req.body)),
+  );
   app.get("/api/dispatch", staff, (req, res) =>
     res.json({
       bookings: db
@@ -527,6 +550,8 @@ export function createApp({
           409,
           "This courier already has an active delivery and reserved return capacity.",
         );
+      const schedule = scheduling.assignment(b, c.id);
+      if (schedule) b.schedule = schedule;
       ensurePin(b);
       b.courier = c;
       b.status = "assigned";
@@ -568,6 +593,19 @@ export function createApp({
           409,
           "This booking allows unattended delivery. A missing signature is not a valid failure reason.",
         );
+      if (target === "heading_to_pickup" && b.schedule) {
+        const clock = easternClock(scheduleNow());
+        if (
+          clock.date !== b.schedule.date ||
+          clock.minute < b.schedule.startMinute ||
+          clock.minute + 2 * price(b.delivery).minutes + 30 >
+            b.schedule.endMinute
+        )
+          fail(
+            409,
+            "This pickup does not fit the reserved delivery and return window. Dispatch review is required.",
+          );
+      }
       b.status = target;
       if (target === "picked_up") {
         b.paymentStatus = "captured";
