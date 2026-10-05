@@ -85,7 +85,7 @@ test("dispatch records a company-caused cancellation with no charge", async ({
     name: `Cancellation and exceptions for ${b.id}`,
   });
   await panel
-    .getByText("Record a CoreRunner-caused failure", { exact: true })
+    .getByText("Record a Company-caused failure", { exact: true })
     .click();
   await panel
     .getByLabel("Failure reason")
@@ -95,7 +95,7 @@ test("dispatch records a company-caused cancellation with no charge", async ({
   ).toBeDisabled();
   await panel
     .getByRole("checkbox", {
-      name: "I confirm this failure was caused by CoreRunner.",
+      name: "I confirm this failure was caused by our company.",
     })
     .check();
   await panel.getByRole("button", { name: "Confirm company failure" }).click();

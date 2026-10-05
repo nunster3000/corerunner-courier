@@ -1,3 +1,4 @@
+import { operator, loadOperator } from "./operator";
 import DemoStudio, { DemoGuide } from "./DemoStudio";
 import { WindowAvailability } from "./ScheduleBoard";
 import CoreyChat from "./CoreyChat.jsx";
@@ -82,7 +83,8 @@ function Logo({ small = false }) {
         <i />
       </span>
       <span>
-        CoreRunner<small>COURIER</small>
+        {operator.brand.shortName}
+        <small>{operator.brand.descriptor}</small>
       </span>
     </span>
   );
@@ -100,7 +102,7 @@ function CityScene() {
   return (
     <div
       className="scene"
-      aria-label="Illustration of a CoreRunner van delivering across Atlanta"
+      aria-label={`Illustration of a ${operator.brand.shortName} delivery van`}
       role="img"
     >
       <svg viewBox="0 0 600 470" aria-hidden="true">
@@ -155,8 +157,8 @@ function CityScene() {
           fill="#163d9e"
           opacity=".12"
         />
-        <path d="M173 353V269q0-15 15-15h173v103H173" fill="#2450d8" />
-        <path d="M361 280h52l45 48v29h-97" fill="#1b3fac" />
+        <path d="M173 353V269q0-15 15-15h173v103H173" fill="var(--blue)" />
+        <path d="M361 280h52l45 48v29h-97" fill="var(--blue)" />
         <path d="M375 290h32l30 33h-62z" fill="#dce9ff" />
         <path d="M172 348h291v17H172z" fill="#142348" />
         <rect x="439" y="337" width="16" height="8" rx="2" fill="#f3d374" />
@@ -172,7 +174,7 @@ function CityScene() {
           fontFamily="Arial,sans-serif"
           fontWeight="700"
         >
-          CoreRunner
+          {operator.brand.shortName}
         </text>
         <text
           x="196"
@@ -182,22 +184,22 @@ function CityScene() {
           fontFamily="Arial,sans-serif"
           letterSpacing="4"
         >
-          COURIER
+          {operator.brand.descriptor}
         </text>
         <path d="M130 386h33v-36h-33z" fill="#d8b677" />
         <path d="M140 350h11v12h-11z" fill="#f0d293" />
-        <path d="M70 181q-11-24 5-34t28 6q7 15-17 39z" fill="#2450d8" />
+        <path d="M70 181q-11-24 5-34t28 6q7 15-17 39z" fill="var(--blue)" />
         <circle cx="84" cy="160" r="5" fill="white" />
         <path
           d="M88 195q-2 44 43 41"
-          stroke="#d4a62a"
+          stroke="var(--gold)"
           strokeWidth="3"
           strokeDasharray="5 7"
           fill="none"
         />
         <path
           d="M475 110l5 9 10 2-7 7 1 10-9-5-9 5 2-10-8-7 11-2z"
-          fill="#d4a62a"
+          fill="var(--gold)"
         />
       </svg>
       <div className="scene-label">
@@ -205,7 +207,8 @@ function CityScene() {
           <MapPin size={18} />
         </span>
         <div>
-          Your neighborhood. Our route.<small>ATLANTA & THE METRO</small>
+          Your neighborhood. Our route.
+          <small>{operator.coverage.headline}</small>
         </div>
       </div>
       <div className="scene-proof">
@@ -490,7 +493,7 @@ function App() {
         <div className="nav-wrap">
           <button
             className="brand-button"
-            aria-label="CoreRunner home"
+            aria-label={`${operator.brand.shortName} home`}
             onClick={goHome}
           >
             <Logo />
@@ -608,7 +611,7 @@ function App() {
               <div className="hero-copy">
                 <div className="eyebrow">
                   <span />
-                  ATLANTA ROOTS. EVERYDAY ROUTES.
+                  LOCAL ROOTS. EVERYDAY ROUTES.
                 </div>
                 <h1>
                   From your door
@@ -652,7 +655,7 @@ function App() {
               <div className="container promises">
                 <span>
                   <MapPin />
-                  Atlanta & the metro
+                  {operator.coverage.headline}
                 </span>
                 <span>
                   <Clock3 />
@@ -677,7 +680,7 @@ function App() {
                 <p>
                   Need it now or a little later?
                   <br />
-                  There’s a CoreRunner for that.
+                  There’s {operator.brand.shortName} for that.
                 </p>
               </div>
               <div className="service-grid">
@@ -769,7 +772,7 @@ function App() {
                   ],
                   [
                     "Leave the route to us",
-                    "Your approved CoreRunner courier collects your package right at your door.",
+                    `Your approved ${operator.brand.shortName} courier collects your package right at your door.`,
                   ],
                   [
                     "Know when it gets there",
@@ -791,7 +794,7 @@ function App() {
                     LOCAL KNOW-HOW. A LITTLE MORE REACH.
                   </p>
                   <h2>
-                    Atlanta, we’ve got
+                    {operator.coverage.primaryCity}, we’ve got
                     <br />
                     places to be.
                   </h2>
@@ -809,19 +812,17 @@ function App() {
                 </div>
                 <div className="coverage-cities">
                   <span className="city atlanta">
-                    <MapPin size={20} /> Atlanta
+                    <MapPin size={20} /> {operator.coverage.primaryCity}
                   </span>
-                  {[
-                    "Marietta",
-                    "Alpharetta",
-                    "Lawrenceville",
-                    "Peachtree City",
-                  ].map((city) => (
-                    <span className="city" key={city}>
-                      {city}
-                      <ArrowUpRight size={15} />
-                    </span>
-                  ))}
+                  {operator.coverage.zones
+                    .map((zone) => zone[0])
+                    .filter((city) => city !== operator.coverage.primaryCity)
+                    .map((city) => (
+                      <span className="city" key={city}>
+                        {city}
+                        <ArrowUpRight size={15} />
+                      </span>
+                    ))}
                   <small>
                     Exact address eligibility is confirmed when booking.
                     <br />
@@ -966,8 +967,8 @@ function App() {
                         <>
                           <h2>From your door to theirs.</h2>
                           <p className="muted">
-                            One pickup. One destination. Across the Atlanta
-                            metro.
+                            One pickup. One destination.{" "}
+                            {operator.coverage.headline}.
                           </p>
                           <div className="fields">
                             {field(
@@ -997,9 +998,11 @@ function App() {
                           </div>
                           <p className="info-note">
                             <MapPin size={18} /> Demo coverage uses city names.
-                            Include Atlanta, Decatur, Marietta, Alpharetta,
-                            Lawrenceville, or Peachtree City in both addresses.
-                            Real geocoding is not connected.
+                            Include a supported city in both addresses:{" "}
+                            {operator.coverage.zones
+                              .map((zone) => zone[0])
+                              .join(", ")}
+                            . Real geocoding is not connected.
                           </p>
                         </>
                       )}
@@ -1314,7 +1317,7 @@ function App() {
                               If nobody answers for a required handoff, there is
                               no mandatory wait. The courier may contact you for
                               unattended permission. Otherwise, same-day return
-                              is the default. CoreRunner-caused returns have no
+                              is the default. Company-caused returns have no
                               additional return charge.
                             </p>
                           </details>
@@ -1446,7 +1449,7 @@ function App() {
             </>
           )}
         </div>
-        <small>CoreRunner Courier · Fictional portfolio project</small>
+        <small>{operator.brand.name} · Fictional portfolio project</small>
       </footer>
       {!chat && !["courier", "demo"].includes(page) && (
         <button className="floating-corey" onClick={openChat}>
@@ -1498,7 +1501,7 @@ function App() {
             <p>To: {data.email}</p>
             <p>
               Hi {data.name.split(" ")[0]}, confirm your email to continue your
-              CoreRunner delivery.
+              {operator.brand.shortName} delivery.
             </p>
             <button className="button" disabled={busy} onClick={verifyAccount}>
               {busy ? "Verifying…" : "Simulate email verification"}{" "}
@@ -1514,4 +1517,28 @@ function App() {
     </>
   );
 }
-createRoot(document.getElementById("root")).render(<App />);
+const root = createRoot(document.getElementById("root"));
+root.render(
+  <main className="container">
+    <p role="status">Loading courier service…</p>
+  </main>,
+);
+loadOperator()
+  .then(() => root.render(<App />))
+  .catch(() => {
+    root.render(
+      <main className="container">
+        <h1>Service unavailable</h1>
+        <p role="alert">
+          Company settings could not be loaded. Make sure the backend is
+          running, then try again.
+        </p>
+        <button
+          className="button primary"
+          onClick={() => window.location.reload()}
+        >
+          Try again
+        </button>
+      </main>,
+    );
+  });

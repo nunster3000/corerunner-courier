@@ -6,15 +6,34 @@ A local full-stack portfolio application for a fictional Atlanta courier service
 
 The intended deliverable is a reusable application for **one courier company at a time**, with a polished mock mode for demonstrations and optional real service integrations supplied by a future owner. Today this is a runnable local portfolio demo, not a production-ready plug-and-play courier business. A buyer can run the demo without AI, maps, email or payment credentials. The local database initializes automatically on startup.
 
-Before a commercial launch, complete centralized branding/business configuration (some CoreRunner names, zones and rules are currently in code), production customer/staff/courier identity, hosted database and private image storage, deployment settings, and the buyer’s chosen email, payment and routing/tracking adapters. Finish operational exception/refund workflows and validate the operator’s policies. Multi-company tenancy is outside this single-operator architecture. Keep demo-role entry, generated scenarios and demo reset disabled in a production build; the current server deliberately refuses production startup.
+Before a commercial launch, complete the remaining operational configuration and production customer/staff/courier identity, hosted database and private image storage, deployment settings, and the buyer’s chosen email, payment and routing/tracking adapters. Finish operational exception/refund workflows and validate the operator’s policies. Multi-company tenancy is outside this single-operator architecture. Keep demo-role entry, generated scenarios and demo reset disabled in a production build; the current server deliberately refuses production startup.
 
 From a clean, committed Git checkout, `npm run package:handoff` exports `artifacts/CoreRunner-source.zip`. It includes committed source, tests, setup instructions and `.env.example`, with a `corerunner-courier/` root folder. It excludes ignored local credentials, databases, proof uploads, installed dependencies, build output and Git history. A guard rejects tracked local-data/credential-file paths; this is not a substitute for reviewing source before release. Unzip, install Node.js 22.13 or newer, run `npm ci`, then `npm run dev` to try the demo. A source archive is not a hosted deployment or an operating-service license.
+
+## Configure a courier company
+
+Edit **`config/operator.json`** in VS Code, save, and restart `npm run dev`. This file ships in the source handoff package. There is no settings dashboard or public settings-write endpoint. Keep credentials out of this file: it contains public business configuration and is committed to Git.
+
+| Setting | What changes |
+| --- | --- |
+| `brand.name`, `shortName`, `descriptor` | Full company name, logo text, page title, demo overview and booking notifications |
+| `brand.primaryColor`, `accentColor` | Main buttons, coverage panel, logo/van accents, focus indicators and browser theme; use six-digit hex colors |
+| `coverage.headline`, `primaryCity` | Homepage service-region text and main city; the main city must be listed in zones |
+| `coverage.zones` | Arrays of city name, latitude and longitude; controls displayed coverage, backend address eligibility and Corey's coverage reply |
+| `pricing.version` | Rate label saved with each new quote; change it whenever rates change |
+| `pricing.baseCents`, `perMileCents`, `perMinuteCents`, `expeditedCents` | Backend quote calculation in USD cents; for example `700` means $7.00 |
+
+Invalid names, duplicate zones, coordinates, colors or negative/fractional rates stop backend startup with an `Invalid operator settings` error. `/api/operator` returns only allowlisted public settings; the website waits for that response before showing booking controls. Test your chosen palette for readable contrast, including white button text. Supporting illustration colors and neutral/status colors retain their existing design.
+
+New quotes use the new rates. Existing quotes retain their saved price until their normal 15-minute expiry, and existing bookings retain their accepted price and return charge. Coverage changes are rechecked at booking confirmation; avoid removing cities with active deliveries, since simulated routing still needs their coordinates. Configure a new buyer's company with a fresh database instead of reusing another operator's records.
+
+Coverage still uses city-name matching and approximate city-center fixtures, not real address validation or road routing. Guided scenarios use the primary city and first other configured zone; choose nearby demo cities so routes fit a shift. The 50 lb limit, package categories, handoff/return/cancellation policies, USD currency, America/New_York timezone and delivery windows remain fixed. Courier shift dates/hours use the existing dispatch planner. Corey remains the agent's name and runs in mock mode. Broader policy, timezone, roster and agent-name customization is future work; this configuration is one step toward a reusable operator installation.
 
 ## Guided portfolio walkthrough
 
 Open **Explore the guided demo** on the homepage, **Guided demo** in the footer, or `/?demo=1`. Choose an everyday delivery, grocery review, or failed-handoff return scenario. Starting a scenario uses your signed-in demo account or creates a sample account through the existing simulated verification flow. It creates a sample quote and booking through the same backend rules; it does not auto-assign a courier, bypass proof, or make real payments.
 
-A guide above the workspace suggests the next role and action using the current backend status. Tracking opens separately. Scenario creation is retry-safe, and existing scenarios can be resumed from the overview. Current Atlanta shift hours and roster availability still apply; outside operating hours, samples can be created and inspected but assignment may wait for an eligible shift. Corey remains scripted.
+A guide above the workspace suggests the next role and action using the current backend status. Tracking opens separately. Scenario creation is retry-safe, and existing scenarios can be resumed from the overview. Current Eastern-time shift hours and roster availability still apply; outside operating hours, samples can be created and inspected but assignment may wait for an eligible shift. Corey remains scripted.
 
 Reset requires an explicit checkbox and removes only backend-tagged scenario bookings for the **current account and browser cookie**. It removes their linked quotes, payments, events, notifications, proof images, grocery evidence and tracking links, releasing any associated courier reservation. It preserves ordinary bookings (including ordinary bookings on the same account), other browsers’ scenarios, accounts, shifts and other local work. Scenario deletion is for walkthrough data only; it is never the business cancellation flow. All scenario/reset endpoints require local demo mode. The public-hosting visitor isolation work is still separate.
 

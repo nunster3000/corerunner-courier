@@ -246,3 +246,7 @@ Use these scenarios to guide meaningful implementation checks rather than treati
 Prioritize technology and the courier background-tracking approach, exact zones and service cutoffs, rate tables and return-price disclosure, vehicle capacity, temperature-sensitive handling, assignment automation, PIN delivery, return handoff proof, and exception handling near closing time.
 
 Also define email-link expiration, evidence retention, location freshness, support permissions, and how sender authorization interacts with a return already underway. The current blueprint does not authorize new fees, regulated-item handling, or additional service promises without a subsequent product decision.
+
+### Central operator configuration implemented
+
+`config/operator.json` controls company identity, primary/accent colors, displayed and backend-enforced demo coverage, and versioned USD quote rates. Settings are validated at startup and served through an allowlisted read-only endpoint. Existing quote/booking prices remain snapshots. Buyers edit this file and restart; there is no settings dashboard yet. The Eastern timezone, fixed service policies, agent name and production integrations remain separate work.

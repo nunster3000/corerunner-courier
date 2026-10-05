@@ -48,7 +48,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #d4a62a;
+  outline: 3px solid var(--gold);
   outline-offset: 4px;
 }
 button {
@@ -207,7 +207,7 @@ nav a:hover {
     transform 0.18s;
 }
 .button:hover {
-  background: #193caf;
+  background: color-mix(in srgb, var(--blue), black 20%);
   transform: translateY(-2px);
 }
 .button.compact {
@@ -2611,13 +2611,13 @@ section[id] {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: #d4a62a;
+  background: var(--gold);
   color: #142348;
 }
 .corey-card {
   padding: 16px;
   margin: 12px 0;
-  border: 1px solid #d4a62a;
+  border: 1px solid var(--gold);
   border-radius: 14px;
   background: #fffdf5;
   font-size: 13px;
@@ -2736,7 +2736,7 @@ section[id] {
 .tracking-route-panel progress {
   width: 100%;
   height: 9px;
-  accent-color: #2450d8;
+  accent-color: var(--blue);
 }
 .simulation-controls {
   display: flex;
@@ -2776,7 +2776,7 @@ section[id] {
 .cancellation-preview {
   padding: 18px;
   margin-top: 12px;
-  border: 1px solid #d4a62a;
+  border: 1px solid var(--gold);
   border-radius: 14px;
   background: #fffdf5;
 }
@@ -2915,7 +2915,7 @@ section[id] {
   background: white;
 }
 .scenario-card > svg {
-  color: #2450d8;
+  color: var(--blue);
 }
 .scenario-card h2 {
   font-size: 24px;

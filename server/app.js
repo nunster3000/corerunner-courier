@@ -1,3 +1,4 @@
+import { operator } from "./operator.js";
 import { installWalkthrough } from "./walkthrough.js";
 import { scheduler, easternClock } from "./scheduling.js";
 import { installCancellations } from "./cancellations.js";
@@ -84,6 +85,7 @@ export function createApp({
       return res.status(400).json({ error: "Provide a JSON object." });
     next();
   });
+  app.get("/api/operator", (req, res) => res.json(operator));
   const auth = (req, res, next) => {
     const s = db
       .prepare(
@@ -437,7 +439,7 @@ export function createApp({
     });
     notify(
       b,
-      `CoreRunner ${b.id} confirmed`,
+      `${operator.brand.shortName} ${b.id} confirmed`,
       `Demo delivery saved. ${b.status === "awaiting_store_readiness" ? "Store readiness review is required before dispatch." : "Awaiting dispatch assignment."} Tracking: /?track=${b.trackingToken}`,
     );
     return { booking: present(b), reused: false };
@@ -577,7 +579,7 @@ export function createApp({
       });
       notify(
         b,
-        "Your CoreRunner courier is assigned",
+        `Your ${operator.brand.shortName} courier is assigned`,
         `${c.name} is assigned to ${b.id}.`,
       );
       return b;
@@ -643,7 +645,7 @@ export function createApp({
       });
       notify(
         b,
-        `CoreRunner ${b.id}: ${b.status.replaceAll("_", " ")}`,
+        `${operator.brand.shortName} ${b.id}: ${b.status.replaceAll("_", " ")}`,
         target === "handoff_failed"
           ? "A handoff was attempted but no recipient was available. Same-day return is scheduled with the assigned courier. No wait is required."
           : "Demo status updated. See your delivery for details.",
@@ -885,7 +887,7 @@ export function createApp({
       event(b, req.courier.id, b.status, { proofId, method, leg });
       notify(
         b,
-        `CoreRunner ${b.id}: ${b.status}`,
+        `${operator.brand.shortName} ${b.id}: ${b.status}`,
         `Handoff recorded with ${method === "pin" ? "a recipient PIN" : method === "photo" ? "a delivery photo" : "a recipient signature"}. ${leg === "return" ? (b.returnFeeOverride === 0 ? "The return fee was waived for a company-caused failure." : "The disclosed return distance and time charge has been recorded.") : ""}`,
       );
       return { booking: present(b), reused: false };

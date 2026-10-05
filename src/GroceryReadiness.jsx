@@ -100,7 +100,7 @@ export default function GroceryReadiness({ booking, dispatch, onChange }) {
             {statusLabel(r.status)} · {r.store}
           </strong>
           <p>
-            Order {r.orderReference} · Pickup date {r.pickupDate} (Atlanta)
+            Order {r.orderReference} · Pickup date {r.pickupDate} (Eastern time)
           </p>
           {r.note && <p>{r.note}</p>}
           <a

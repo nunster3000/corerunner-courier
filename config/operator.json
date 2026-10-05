@@ -1,0 +1,28 @@
+{
+  "brand": {
+    "name": "CoreRunner Courier",
+    "shortName": "CoreRunner",
+    "descriptor": "COURIER",
+    "primaryColor": "#2450d8",
+    "accentColor": "#d4a62a"
+  },
+  "coverage": {
+    "headline": "Atlanta & the metro",
+    "primaryCity": "Atlanta",
+    "zones": [
+      ["Atlanta", 33.749, -84.388],
+      ["Decatur", 33.774, -84.296],
+      ["Peachtree City", 33.396, -84.596],
+      ["Lawrenceville", 33.957, -83.988],
+      ["Alpharetta", 34.075, -84.294],
+      ["Marietta", 33.952, -84.55]
+    ]
+  },
+  "pricing": {
+    "version": "demo-rates-v1",
+    "baseCents": 500,
+    "perMileCents": 125,
+    "perMinuteCents": 20,
+    "expeditedCents": 800
+  }
+}

@@ -471,7 +471,7 @@ export function RecipientTracking({ token, onBack }) {
   return (
     <section className="container tracking-page">
       <button className="back-link" onClick={onBack}>
-        <ArrowLeft size={16} /> CoreRunner home
+        <ArrowLeft size={16} /> Service home
       </button>
       <p className="eyebrow">RECIPIENT TRACKING · LOCAL DEMO</p>
       <h1>

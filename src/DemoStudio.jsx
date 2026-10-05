@@ -1,3 +1,4 @@
+import { operator } from "./operator";
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowRight, Package, RotateCcw, ShieldCheck } from "lucide-react";
 import { api, statusLabel } from "./api";
@@ -5,7 +6,9 @@ const demoProfile = () => ({
   name: "Alex Sample",
   email: `tour-${crypto.randomUUID()}@example.com`,
   phone: "4045550123",
-  pickup: "100 Sample Street, Atlanta, GA 30303",
+  get pickup() {
+    return `100 Sample Street, ${operator.coverage.primaryCity}`;
+  },
 });
 export function nextStep(run) {
   const b = run.booking;
@@ -19,7 +22,7 @@ export function nextStep(run) {
     return {
       page: "dispatch",
       title: "Assign an available courier",
-      text: "Enter demo dispatch, find this booking, and choose an available courier. Assignment respects Atlanta operating hours, shifts and existing reservations.",
+      text: "Enter demo dispatch, find this booking, and choose an available courier. Assignment respects Eastern operating hours, shifts and existing reservations.",
     };
   if (["assigned", "heading_to_pickup", "picked_up"].includes(b.status))
     return {
@@ -182,8 +185,9 @@ export default function DemoStudio({
         Every perspective.
       </h1>
       <p className="demo-lead">
-        Try CoreRunner as the customer, the dispatcher and the courier. Follow a
-        package from booking to proof of delivery—or bring it safely back home.
+        Try {operator.brand.shortName} as the customer, the dispatcher and the
+        courier. Follow a package from booking to proof of delivery—or bring it
+        safely back home.
       </p>
       <div className="demo-callout">
         <ShieldCheck size={24} />
@@ -192,7 +196,7 @@ export default function DemoStudio({
           <p>
             Starting a scenario creates a sample booking and, if needed, a
             sample account. Payments, emails, tracking and Corey are simulated.
-            Nothing is sent or charged. Dispatch follows current Atlanta
+            Nothing is sent or charged. Dispatch follows current Eastern
             operating hours and available shifts.
           </p>
         </div>
@@ -279,9 +283,9 @@ export default function DemoStudio({
         <p className="eyebrow">ABOUT THIS PROJECT</p>
         <h2>A small service, with the details handled.</h2>
         <p>
-          CoreRunner explores what a personal and small-business courier
-          platform needs beyond a booking form: capacity, custody, consent,
-          evidence and recovery when a delivery goes wrong.
+          {operator.brand.shortName} explores what a personal and small-business
+          courier platform needs beyond a booking form: capacity, custody,
+          consent, evidence and recovery when a delivery goes wrong.
         </p>
         <div className="story-grid">
           <div>
@@ -317,7 +321,7 @@ export default function DemoStudio({
         </a>
       </section>
       <button className="text-button" onClick={() => onNavigate("home")}>
-        Back to CoreRunner
+        Back to {operator.brand.shortName}
       </button>
     </section>
   );

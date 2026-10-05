@@ -1,3 +1,4 @@
+import { operator } from "./operator.js";
 import { transaction } from "./db.js";
 import { fail } from "./domain.js";
 export const scenarios = [
@@ -87,8 +88,8 @@ export function installWalkthrough(
           reused: true,
         };
       const d = {
-        pickup: "100 Sample Street, Atlanta, GA 30303",
-        dropoff: "200 Example Lane, Decatur, GA 30030",
+        pickup: `100 Sample Street, ${operator.coverage.primaryCity}`,
+        dropoff: `200 Example Lane, ${operator.coverage.zones.find((z) => z[0] !== operator.coverage.primaryCity)?.[0] || operator.coverage.primaryCity}`,
         recipient: "Jamie Sample",
         recipientEmail: "jamie@example.com",
         item: scenario.item,

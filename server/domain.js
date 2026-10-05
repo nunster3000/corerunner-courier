@@ -1,3 +1,4 @@
+import { operator } from "./operator.js";
 export class Problem extends Error {
   constructor(status, message) {
     super(message);
@@ -37,22 +38,20 @@ export function profile(input) {
   };
 }
 // Explicit demo fixtures, NOT geocoding or measured road distance. Replace this adapter before deployment.
-const zones = [
-  ["Peachtree City", 33.396, -84.596],
-  ["Lawrenceville", 33.957, -83.988],
-  ["Alpharetta", 34.075, -84.294],
-  ["Marietta", 33.952, -84.55],
-  ["Decatur", 33.774, -84.296],
-  ["Atlanta", 33.749, -84.388],
-];
-export function demoZone(address) {
-  const z = zones.find(([city]) =>
-    new RegExp(`\\b${city}\\b`, "i").test(address),
-  );
+export function demoZone(address, settings = operator) {
+  const z = [...settings.coverage.zones]
+    .sort((a, b) => b[0].length - a[0].length)
+    .find(([city]) => {
+      const escaped = city.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(
+        `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`,
+        "iu",
+      ).test(address);
+    });
   if (!z)
     fail(
       400,
-      "Demo coverage supports addresses naming Atlanta, Decatur, Marietta, Alpharetta, Lawrenceville, or Peachtree City.",
+      `Demo coverage supports addresses naming ${settings.coverage.zones.map((z) => z[0]).join(", ")}.`,
     );
   return z;
 }
@@ -108,20 +107,20 @@ export function delivery(input) {
   demoZone(d.dropoff);
   return d;
 }
-export function price(d) {
-  const a = demoZone(d.pickup),
-    b = demoZone(d.dropoff);
+export function price(d, settings = operator) {
+  const a = demoZone(d.pickup, settings),
+    b = demoZone(d.dropoff, settings);
   const miles = Math.max(
     3,
     Math.round(Math.hypot((a[1] - b[1]) * 69, (a[2] - b[2]) * 57) * 1.3),
   );
   const minutes = Math.ceil(miles * 2.5);
-  const base = 500,
-    distance = miles * 125,
-    time = minutes * 20,
-    expedited = d.service === "Expedited" ? 800 : 0;
+  const base = settings.pricing.baseCents,
+    distance = miles * settings.pricing.perMileCents,
+    time = minutes * settings.pricing.perMinuteCents,
+    expedited = d.service === "Expedited" ? settings.pricing.expeditedCents : 0;
   return {
-    version: "demo-rates-v1",
+    version: settings.pricing.version,
     currency: "USD",
     base,
     distance,

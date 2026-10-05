@@ -64,6 +64,9 @@ test("keyboard skip link reaches main content and project overview is available"
   page,
 }) => {
   await page.goto("/");
+  await expect(
+    page.getByRole("link", { name: "Skip to main content" }),
+  ).toBeAttached();
   await page.keyboard.press("Tab");
   await expect(
     page.getByRole("link", { name: "Skip to main content" }),

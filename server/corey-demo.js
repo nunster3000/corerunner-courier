@@ -1,3 +1,4 @@
+import { operator } from "./operator.js";
 import { email, text, fail } from "./domain.js";
 const prompts = {
   name: "What’s your full name?",
@@ -40,7 +41,7 @@ export function demoReply(s, message, user, createQuote, listBookings) {
     );
   if (/^coverage\??$/i.test(value))
     return result(
-      "Demo coverage includes Atlanta, Decatur, Marietta, Alpharetta, Lawrenceville, and Peachtree City. Packages must fit a car/SUV, be manageable by one courier, and weigh no more than 50 lb each.",
+      `Demo coverage includes ${operator.coverage.zones.map((z) => z[0]).join(", ")}. Packages must fit a car/SUV, be manageable by one courier, and weigh no more than 50 lb each.`,
     );
   if (/^status\??$/i.test(value)) {
     if (!user)

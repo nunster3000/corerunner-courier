@@ -146,7 +146,7 @@ export function installCancellations(
       save(b);
       notify(
         b,
-        "CoreRunner cancellation update",
+        "Courier cancellation update",
         `${terms.reason} All amounts are simulated.`,
       );
       return { booking: present(b), reused: false };
@@ -180,7 +180,7 @@ export function installCancellations(
         );
       const reason = text(req.body.reason, "Failure reason", 500);
       if (req.body.confirmed !== true)
-        fail(400, "Confirm that this is a CoreRunner-caused failure.");
+        fail(400, "Confirm that this is a company-caused failure.");
       const pickedUp = !before.includes(b.status);
       b.exception = {
         requestKey: key,
@@ -206,7 +206,7 @@ export function installCancellations(
       save(b);
       notify(
         b,
-        "CoreRunner service exception",
+        "Courier service exception",
         pickedUp
           ? "A company-caused failure was recorded. No return fee will be charged. The original captured charge needs staff refund review; no refund has been issued."
           : "A company-caused failure cancelled this delivery with no fee. The simulated authorization was released.",

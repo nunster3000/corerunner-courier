@@ -248,7 +248,7 @@ export default function CoreyChat({
               If handoff fails, a same-day return is the default.
               Customer-caused return adds {money(quote.price.returnTotal)};
               original charge is retained. No extra return fee for a
-              CoreRunner-caused failure.
+              Company-caused failure.
             </p>
             {quote.schedule && (
               <p>

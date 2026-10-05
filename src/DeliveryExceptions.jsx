@@ -51,7 +51,7 @@ export default function DeliveryExceptions({ booking: b, dispatch, onChange }) {
       )}
       {b.exception && (
         <div className="info-note">
-          <strong>CoreRunner-caused failure</strong>
+          <strong>Company-caused failure</strong>
           <p>{b.exception.reason}</p>
           <p>
             No return fee.{" "}
@@ -164,7 +164,7 @@ export default function DeliveryExceptions({ booking: b, dispatch, onChange }) {
           "handoff_failed",
         ].includes(b.status) && (
           <details>
-            <summary>Record a CoreRunner-caused failure</summary>
+            <summary>Record a Company-caused failure</summary>
             <fieldset disabled={busy}>
               <label>
                 Failure reason
@@ -180,7 +180,7 @@ export default function DeliveryExceptions({ booking: b, dispatch, onChange }) {
                   checked={company}
                   onChange={(e) => setCompany(e.target.checked)}
                 />
-                I confirm this failure was caused by CoreRunner.
+                I confirm this failure was caused by our company.
               </label>
               {!before.includes(b.status) && (
                 <label className="checkbox-label">
