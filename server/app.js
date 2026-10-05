@@ -1,3 +1,4 @@
+import { syncSimulation, trackingView, changeSimulation } from "./tracking.js";
 import { installGroceries, requireCurrentReadiness } from "./groceries.js";
 import { installCorey } from "./corey.js";
 import express from "express";
@@ -133,6 +134,7 @@ export function createApp({
     return b;
   };
   const save = (b) => {
+    syncSimulation(b);
     const { userId, quoteId, ...payload } = b;
     db.prepare("UPDATE bookings SET payload=? WHERE id=?").run(
       JSON.stringify(payload),
@@ -182,6 +184,7 @@ export function createApp({
       .all(id);
   const present = (b) => ({
     ...b,
+    tracking: trackingView(b),
     proofs: proofSummary(b.id),
     events: db
       .prepare(
@@ -458,8 +461,9 @@ export function createApp({
           "SELECT kind,created FROM events WHERE booking_id=? ORDER BY id",
         )
         .all(b.id),
-      location: null,
-      note: "Phone GPS and arrival estimates are not connected. This page shows backend status only.",
+      location: trackingView(b).location,
+      tracking: trackingView(b),
+      note: trackingView(b).note,
     });
   });
   app.post("/api/demo/dispatch-session", demoOnly, (req, res) => {
@@ -617,6 +621,15 @@ export function createApp({
         }),
     }),
   );
+  app.post("/api/courier/:id/simulation", courier, (req, res) => {
+    const b = transaction(db, () => {
+      const b = assigned(req);
+      changeSimulation(b, req.body);
+      save(b);
+      return b;
+    });
+    res.json({ tracking: trackingView(b) });
+  });
   app.post("/api/courier/:id/advance", courier, (req, res) =>
     advance(req, res, true),
   );

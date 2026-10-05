@@ -196,11 +196,39 @@ test("saved booking survives refresh and dispatch status reaches recipient witho
       recipient.getByRole("heading", { name: "Picked up", exact: true }),
     ).toBeVisible();
     await expect(
-      recipient.getByText(
-        "Phone GPS and arrival estimates are not connected.",
-        { exact: false },
-      ),
+      recipient.getByText("Simulated route and location, not phone GPS", {
+        exact: false,
+      }),
     ).toBeVisible();
+    await page.request.post("/api/demo/courier-session", {
+      data: { courierId: "cr-01" },
+    });
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: "Demo courier", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Head to recipient", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Advance demo location" }).click();
+    await expect(
+      recipient.getByRole("progressbar", { name: "Simulated route progress" }),
+    ).toHaveAttribute("value", "20", { timeout: 10000 });
+    await page.getByRole("button", { name: "Pause demo tracking" }).click();
+    await expect(
+      recipient.getByText("Updates paused", { exact: false }),
+    ).toBeVisible({ timeout: 10000 });
+    expect((await recipient.request.get("/api/bookings")).status()).toBe(401);
+    await recipient.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await recipient.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await recipient.screenshot({
+      path: "test-results/tracking-mobile.png",
+      fullPage: true,
+    });
   } finally {
     await context.close();
   }

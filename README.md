@@ -32,7 +32,7 @@ Browser tests use installed Google Chrome on macOS when available, otherwise Pla
 3. Review the server-generated demo quote, original total, and possible return fee. Accept the quote and policy, then confirm the demo booking. You can also simulate a declined authorization; no booking or payment event is created on decline.
 4. Open My deliveries to see your saved booking and simulated email inbox. Refresh the browser; the session and records remain available.
 5. Open Demo dispatch in the footer and explicitly enter the local demo staff role. Assign an available sample courier. Move to heading to pickup, then picked up; pickup captures the simulated original charge once.
-6. Follow the recipient tracking link in a private browser window. It works without an account and exposes only status, service, courier, and the event timeline. It grants no booking-management permission.
+6. Follow the recipient tracking link in a private browser window. It works without an account and exposes status, service, courier, event timestamps, and a simulated route using city labels. It grants no booking-management permission.
 7. Open Demo courier in the footer and choose the assigned courier. Advance through pickup and the delivery route. Only that courier can access and complete the assigned job.
 8. Choose Record delivery proof. For an attended delivery, enter the recipient PIN from the simulated inbox under My deliveries, or have the receiving person enter their name, draw a signature, and confirm receipt. The courier does not receive the PIN through their API.
 9. For an authorized unattended delivery, select a sample photo and confirm the package is at a suitable drop-off location. The server rejects completion without sender consent and valid image evidence. Photos are normalized to WebP and stored privately in SQLite; they are not served from the public directory.
@@ -52,7 +52,7 @@ There is no generic completion bypass in dispatch. Delivered and returned status
 | PIN verification, captured signatures, normalized delivery photos and proof history | The app records evidence; it does not independently establish signer identity or confirm photo contents |
 | Sender-only unattended authorization, immediate return scheduling, signed returns | No outgoing contact is sent; after-hours exceptions and other failure causes remain unfinished |
 | Pickup capture, return charge, ledger and event history | No real money movement, card processing, cancellation, or refunds yet |
-| Recipient tracking tokens with expiration | No phone GPS, maps, ETA or automatic live updates yet |
+| Recipient tracking tokens, simulated route positions, automatic polling and stale-update labels | No phone GPS, geographic street maps or arrival estimates |
 | Grocery screenshot uploads, staff approval/rejection, resubmission and current-date assignment checks | Human review only; no OCR or store integration |
 | Customer-scoped notification history | Demo inbox includes sender and recipient copies; nothing is sent |
 
@@ -78,6 +78,12 @@ Demo city matching supports Atlanta, Decatur, Marietta, Alpharetta, Lawrencevill
 
 The implemented return branch models recipient unavailability only. Other failure reasons, company-caused returns, after-hours exceptions, and unavailable senders require further work. A same-day due date is recorded in Atlanta time, but this is not an automated feasibility or scheduling guarantee. The initial return-proof implementation uses a captured signature; unattended returns and alternative return-PIN policies are not yet implemented.
 
+## Simulated tracking
+
+In Demo courier, start a pickup, delivery or return route, then choose **Advance demo location**. Each click advances the current illustrative route by 20%. Pause/resume controls demonstrate interrupted tracking. Positions and sequence numbers are persisted in the booking; clients cannot submit coordinates, arbitrary percentages, or timestamps. Only the assigned courier can operate these controls. Concurrent or repeated updates with an old sequence are rejected.
+
+Recipient tracking refreshes every five seconds while visible and supports manual refresh. It shows an original schematic route, city labels, percentage, last server update, and paused/stale status. Positions become stale after 60 seconds without an update. A failed refresh keeps the last result with a connection warning; an expired tracking link clears the result. Completed deliveries/returns hide the courier marker. Route movement never changes custody, captures payments, or completes a handoff; those still require the normal actions and proof. No GPS permission, maps account, API key, or external tracking service is used.
+
 ## Grocery readiness
 
 Evidence is stored as normalized WebP in SQLite and accessible only to the booking sender or a demo dispatcher. Uploads use the existing 4 MB image validation, metadata stripping, and 24-megapixel limit. Original filenames are not served. A booking allows up to ten uploads; idempotency keys prevent retry duplicates. Replacements invalidate previous approval. Review actions must reference the latest evidence, and completed reviews cannot be silently reversed.
@@ -91,7 +97,7 @@ Approval requires evidence dated today in Atlanta. Scheduled grocery deliveries 
 - Signatures contain the receiving person's name, explicit receipt consent, and normalized drawing points. Presence validation rejects empty marks; it is not biometric or legal identity verification.
 - Delivery photos must decode as JPEG, PNG, or WebP, fit within 4 MB and 24 million pixels, and contain a single frame. The server normalizes them, removes metadata including GPS, and restricts retrieval to the sender, assigned courier, or dispatch session. Recipient tracking tokens cannot retrieve evidence.
 - Only the sender account can authorize unattended delivery. Authorization remains open before the return starts. A courier may start a return immediately; if that happens before authorization or photo submission finishes, the backend rejects the conflicting action. Authorization alone does not mark anything delivered.
-- The courier must refresh the workspace to see new sender instructions. Phone GPS and automatic updates remain future work.
+- The courier must refresh the workspace to see new sender instructions. Recipient tracking polls every five seconds while visible; phone GPS remains future work.
 - All evidence is stored in the ignored local database. The existing database gains new tables without removing prior records. Existing already-assigned bookings without a PIN can use a signature; new assignments provision a PIN if needed.
 
 ## Source layout

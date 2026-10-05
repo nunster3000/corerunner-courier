@@ -1,7 +1,11 @@
-export async function api(path, { method = "GET", body, headers = {} } = {}) {
+export async function api(
+  path,
+  { method = "GET", body, headers = {}, signal } = {},
+) {
   const response = await fetch(`/api${path}`, {
     method,
     credentials: "same-origin",
+    signal,
     headers: {
       ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
       ...headers,

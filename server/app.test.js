@@ -372,6 +372,8 @@ test("only assigned courier can complete a handoff and valid PIN produces one pr
   );
   const tracking = (await client()("/track/" + b.trackingToken)).body;
   assert.equal(tracking.status, "delivered");
+  assert.equal(tracking.location, null);
+  assert.equal(tracking.tracking.active, false);
   assert.equal(tracking.proofs, undefined);
   assert.equal(tracking.pin, undefined);
 });
@@ -919,4 +921,131 @@ test("grocery approvals require current pickup date and are rechecked at assignm
       .status,
     409,
   );
+});
+
+test("simulated tracking is courier-scoped, sequenced, persisted and cannot complete a handoff", async (t) => {
+  const { client, db } = await fixture(t);
+  const sender = client(),
+    driver = client(),
+    other = client(),
+    recipient = client();
+  await login(sender);
+  const b = await book(sender);
+  await sender("/demo/dispatch-session", {});
+  await sender(`/dispatch/${b.id}/assign`, { courierId: "cr-01" });
+  await driver("/demo/courier-session", { courierId: "cr-01" });
+  await other("/demo/courier-session", { courierId: "cr-02" });
+  assert.equal(
+    (
+      await recipient(`/courier/${b.id}/simulation`, {
+        action: "advance",
+        sequence: 0,
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await other(`/courier/${b.id}/simulation`, {
+        action: "advance",
+        sequence: 0,
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await driver(`/courier/${b.id}/simulation`, {
+        action: "advance",
+        sequence: 0,
+      })
+    ).status,
+    409,
+  );
+  await driver(`/courier/${b.id}/advance`, { status: "heading_to_pickup" });
+  let r = (await recipient("/track/" + b.trackingToken)).body;
+  assert.equal(r.tracking.route.to, "Atlanta");
+  assert.equal(r.tracking.progress, 0);
+  assert.equal(r.location.source, "simulation");
+  const initial = r.tracking.sequence;
+  const moved = await driver(`/courier/${b.id}/simulation`, {
+    action: "advance",
+    sequence: initial,
+    progress: 100,
+    latitude: 90,
+  });
+  assert.equal(moved.body.tracking.progress, 20);
+  assert.equal(
+    (
+      await driver(`/courier/${b.id}/simulation`, {
+        action: "advance",
+        sequence: initial,
+      })
+    ).status,
+    409,
+  );
+  let trip = moved.body.tracking;
+  trip = (
+    await driver(`/courier/${b.id}/simulation`, {
+      action: "pause",
+      sequence: trip.sequence,
+    })
+  ).body.tracking;
+  assert.equal(trip.stale, true);
+  assert.equal(
+    (
+      await driver(`/courier/${b.id}/simulation`, {
+        action: "advance",
+        sequence: trip.sequence,
+      })
+    ).status,
+    409,
+  );
+  trip = (
+    await driver(`/courier/${b.id}/simulation`, {
+      action: "resume",
+      sequence: trip.sequence,
+    })
+  ).body.tracking;
+  while (trip.progress < 100)
+    trip = (
+      await driver(`/courier/${b.id}/simulation`, {
+        action: "advance",
+        sequence: trip.sequence,
+      })
+    ).body.tracking;
+  r = (await recipient("/track/" + b.trackingToken)).body;
+  assert.equal(r.status, "heading_to_pickup");
+  assert.equal(r.tracking.progress, 100);
+  assert.equal(
+    JSON.parse(
+      db.prepare("SELECT payload FROM bookings WHERE id=?").get(b.id).payload,
+    ).simulatedTrip.progress,
+    100,
+  );
+  await driver(`/courier/${b.id}/advance`, { status: "picked_up" });
+  await driver(`/courier/${b.id}/advance`, { status: "heading_to_delivery" });
+  r = (await recipient("/track/" + b.trackingToken)).body;
+  assert.equal(r.tracking.phase, "delivery");
+  assert.equal(r.tracking.progress, 0);
+  assert.equal(r.tracking.route.to, "Decatur");
+  const stored = JSON.parse(
+    db.prepare("SELECT payload FROM bookings WHERE id=?").get(b.id).payload,
+  );
+  stored.simulatedTrip.updatedAt = new Date(Date.now() - 120000).toISOString();
+  db.prepare("UPDATE bookings SET payload=? WHERE id=?").run(
+    JSON.stringify(stored),
+    b.id,
+  );
+  assert.equal(
+    (await recipient("/track/" + b.trackingToken)).body.tracking.stale,
+    true,
+  );
+  await driver(`/courier/${b.id}/advance`, { status: "handoff_failed" });
+  await driver(`/courier/${b.id}/advance`, { status: "returning" });
+  r = (await recipient("/track/" + b.trackingToken)).body;
+  assert.equal(r.tracking.phase, "return");
+  assert.equal(r.tracking.route.to, "Atlanta");
+  assert.equal(r.tracking.progress, 0);
+  assert.equal(JSON.stringify(r).includes(sample.pickup), false);
 });

@@ -1,5 +1,6 @@
+import TrackingRoute from "./TrackingRoute";
 import GroceryReadiness from "./GroceryReadiness";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -411,19 +412,45 @@ export function RecipientTracking({ token, onBack }) {
   const [record, setRecord] = useState(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  async function load() {
-    setBusy(true);
-    try {
-      setRecord(await api("/track/" + encodeURIComponent(token)));
-      setError("");
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const refresh = useRef(() => {});
   useEffect(() => {
+    let disposed = false,
+      pending = false,
+      controller;
+    const load = async () => {
+      if (pending || disposed) return;
+      pending = true;
+      setBusy(true);
+      controller = new AbortController();
+      try {
+        const next = await api("/track/" + encodeURIComponent(token), {
+          signal: controller.signal,
+        });
+        if (!disposed) {
+          setRecord(next);
+          setError("");
+        }
+      } catch (e) {
+        if (!disposed) {
+          setError(e.message);
+          if (e.status === 404) setRecord(null);
+        }
+      } finally {
+        pending = false;
+        if (!disposed) setBusy(false);
+      }
+    };
+    refresh.current = load;
+    setRecord(null);
     load();
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 5000);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      controller?.abort();
+    };
   }, [token]);
   return (
     <section className="container tracking-page">
@@ -456,7 +483,13 @@ export function RecipientTracking({ token, onBack }) {
               ? `Courier: ${record.courier.name}`
               : "Waiting for a courier assignment"}
           </p>
-          <p className="info-note">{record.note}</p>
+          <TrackingRoute tracking={record.tracking} />
+          <p className="info-note">
+            Updates refresh every 5 seconds while this page is visible.{" "}
+            {error
+              ? "Connection interrupted; showing the last received update."
+              : ""}
+          </p>
           <ol className="event-list">
             {record.events.map((e, i) => (
               <li key={i}>
@@ -471,7 +504,11 @@ export function RecipientTracking({ token, onBack }) {
           </p>
         </article>
       )}
-      <button className="button" disabled={busy} onClick={load}>
+      <button
+        className="button"
+        disabled={busy}
+        onClick={() => refresh.current()}
+      >
         <RefreshCw size={16} /> Refresh progress
       </button>
     </section>

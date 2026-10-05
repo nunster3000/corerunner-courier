@@ -204,7 +204,7 @@ Backend requirements include role-based access, valid transition checks, duplica
 | Booking and dispatch | Implement real persisted state and rules in the application backend |
 | Payments | Clearly labeled simulator; no real cards or money movement |
 | Email and verification | Demo inbox with backend-generated links; not proof of real mailbox ownership |
-| Tracking | Clearly labeled simulated trips plus a real phone-location test path |
+| Tracking | Implemented backend-owned simulated route controls, recipient polling and stale-position labels. Real phone-location test path remains future work. |
 | Corey | Scripted local demo by default. Optional AI adapter is disabled and reserved for a future owner’s configuration. |
 | Grocery evidence | Implemented screenshot upload, human review, rejection/resubmission and current-date dispatch checks; no AI extraction or direct store verification |
 

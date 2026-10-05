@@ -1,3 +1,4 @@
+import TrackingRoute from "./TrackingRoute";
 import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -185,6 +186,53 @@ export default function CourierWorkspace({ onBack }) {
                   </div>
                 </div>
               </div>
+              <TrackingRoute tracking={b.tracking} />
+              {b.tracking?.moving && (
+                <div className="simulation-controls">
+                  <p>
+                    Demo controls update the backend. Reaching 100% never
+                    completes a pickup or delivery automatically.
+                  </p>
+                  <button
+                    className="button secondary"
+                    disabled={
+                      busy || b.tracking.paused || b.tracking.progress >= 100
+                    }
+                    onClick={() =>
+                      run(() =>
+                        api(`/courier/${b.id}/simulation`, {
+                          method: "POST",
+                          body: {
+                            action: "advance",
+                            sequence: b.tracking.sequence,
+                          },
+                        }),
+                      )
+                    }
+                  >
+                    Advance demo location
+                  </button>
+                  <button
+                    className="button secondary"
+                    disabled={busy}
+                    onClick={() =>
+                      run(() =>
+                        api(`/courier/${b.id}/simulation`, {
+                          method: "POST",
+                          body: {
+                            action: b.tracking.paused ? "resume" : "pause",
+                            sequence: b.tracking.sequence,
+                          },
+                        }),
+                      )
+                    }
+                  >
+                    {b.tracking.paused
+                      ? "Resume demo tracking"
+                      : "Pause demo tracking"}
+                  </button>
+                </div>
+              )}
               <div className="job-facts">
                 <span>{b.delivery.weight} lbs</span>
                 <span>{b.delivery.service}</span>

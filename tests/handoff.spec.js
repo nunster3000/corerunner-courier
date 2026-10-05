@@ -142,6 +142,7 @@ test("courier completes PIN and authorized photo handoffs, then a signed return"
     .click();
   await page.getByLabel("Receiving person’s name").fill("Handoff Demo");
   const pad = page.getByLabel("Draw recipient signature");
+  await pad.scrollIntoViewIfNeeded();
   const box = await pad.boundingBox();
   await page.mouse.move(box.x + 20, box.y + 40);
   await page.mouse.down();
