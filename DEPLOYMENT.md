@@ -11,7 +11,7 @@ Local tests cover the hosted request handler with an injected store, browser iso
 1. Import `nunster3000/corerunner-courier` into Vercel. Use the repository root, Vite framework, Node.js **22.x**, `npm run build`, and `dist`. The committed `vercel.json` routes `/api/*` to the Node function in `api/index.js`; `server/index.js` remains the local-only entrypoint.
 2. In that project's Storage/Marketplace section, connect **Neon Postgres**. Review the provider's plan before provisioning. Use a separate database or branch for preview/testing and for the public portfolio deployment. This adapter uses the Neon HTTP driver, not a generic PostgreSQL TCP connection.
 3. Add the server environment variables below. Keep them out of Git, chat, and all `VITE_` variables. `APP_ORIGIN` must match the exact deployed HTTPS origin, such as `https://your-project.vercel.app`, without a trailing slash. Do not allow wildcard preview origins. Preview deployments need their own matching origin and database configuration.
-4. Using the connected database's `DATABASE_URL` in your ignored local `.env`, run `npm run setup:hosted` once. It creates two namespaced tables and an expiry index. It does not import local users, bookings or images. Run it only against the intended demo database.
+4. The hosted API automatically creates its two namespaced demo tables and expiry index on first startup. Initialization is serialized across cold instances and only creates missing objects; it never imports local users, bookings or images. The connected database role needs permission to create these objects. `npm run setup:hosted` remains available for optional manual setup against the intended demo database.
 5. Deploy/redeploy the Vercel project after setting the environment variables. Keep Vercel Deployment Protection enabled for previews. The app also requires a demo access password before exposing any demo account or role tools.
 6. Verify the checklist below before sharing the URL and access password with reviewers.
 
@@ -61,3 +61,7 @@ Limits and retention:
 - [Vercel Node functions](https://vercel.com/docs/functions/runtimes/node-js)
 - [Vercel function limits](https://vercel.com/docs/functions/limitations)
 - [Neon serverless driver](https://github.com/neondatabase/serverless)
+
+## Startup troubleshooting
+
+A successful Vercel build does not confirm that the API has its environment settings. Check Production values for `APP_MODE`, `APP_ORIGIN`, `DEMO_ACCESS_PASSWORD`, `DEMO_SESSION_SECRET` and `DATABASE_URL`, then redeploy. Missing/invalid setting names appear in server logs without values. Storage initialization failures return a separate code and retry on later requests. Do not disable the access gate to work around missing secrets.

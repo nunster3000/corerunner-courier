@@ -1,8 +1,10 @@
+import { initializeHostedSchema } from "./hosted-schema.js";
 import { neon } from "@neondatabase/serverless";
 
 export function hostedStore(url) {
   const sql = neon(url);
   return {
+    initialize: () => initializeHostedSchema(sql),
     async read(id) {
       const rows =
         await sql`SELECT snapshot, revision, expires FROM corerunner_demo_workspaces WHERE id=${id} AND expires > now()`;
