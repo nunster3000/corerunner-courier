@@ -1,3 +1,4 @@
+import { installWalkthrough } from "./walkthrough.js";
 import { scheduler, easternClock } from "./scheduling.js";
 import { installCancellations } from "./cancellations.js";
 import { syncSimulation, trackingView, changeSimulation } from "./tracking.js";
@@ -163,8 +164,8 @@ export function createApp({
       recipients || [u.email, b.delivery.recipientEmail],
     ))
       db.prepare(
-        "INSERT INTO notifications(user_id,recipient,subject,body,created) VALUES(?,?,?,?,?)",
-      ).run(b.userId, recipient, subject, body, stamp());
+        "INSERT INTO notifications(user_id,recipient,subject,body,created,booking_id) VALUES(?,?,?,?,?,?)",
+      ).run(b.userId, recipient, subject, body, stamp(), b.id);
   };
   const ensurePin = (b) => {
     if (db.prepare("SELECT 1 FROM handoff_codes WHERE booking_id=?").get(b.id))
@@ -368,81 +369,95 @@ export function createApp({
   app.post("/api/quotes", auth, (req, res) =>
     res.status(201).json(createQuote(req.user.id, req.body)),
   );
-  app.post("/api/bookings", auth, (req, res) => {
+  const createBooking = (req) => {
     const key = text(req.get("Idempotency-Key"), "Idempotency key", 100);
-    const result = transaction(db, () => {
-      const previous = db
-        .prepare(
-          "SELECT id,quote_id FROM bookings WHERE user_id=? AND request_key=?",
-        )
-        .get(req.user.id, key);
-      if (previous) {
-        if (previous.quote_id !== req.body.quoteId)
-          fail(409, "This request key already belongs to another quote.");
-        return { booking: present(read(previous.id)), reused: true };
-      }
-      const row = db
-        .prepare("SELECT * FROM quotes WHERE id=? AND user_id=?")
-        .get(String(req.body.quoteId), req.user.id);
-      if (!row) fail(404, "Quote not found.");
-      const existing = db
-        .prepare("SELECT id FROM bookings WHERE quote_id=?")
-        .get(row.id);
-      if (existing)
-        return { booking: present(read(existing.id)), reused: true };
-      if (row.expires < Date.now())
-        fail(409, "Your quote expired. Request a fresh quote.");
-      if (req.body.accepted !== true)
-        fail(400, "Confirm the quote and return policy before booking.");
-      if (req.body.paymentOutcome === "decline")
-        fail(
-          402,
-          "Simulated authorization declined. No booking was created. Retry with approval.",
-        );
-      const q = JSON.parse(row.payload);
-      delivery(q.delivery);
-      const schedule = scheduling.plan(q.delivery);
-      const b = {
-        id: "CR-" + randomBytes(5).toString("hex").toUpperCase(),
-        userId: req.user.id,
-        quoteId: q.id,
-        delivery: q.delivery,
-        schedule,
-        price: q.price,
-        status:
-          q.delivery.item === "Groceries"
-            ? "awaiting_store_readiness"
-            : "confirmed",
-        paymentStatus: "authorized",
-        courier: null,
-        created: stamp(),
-        trackingToken: secret(),
-      };
-      db.prepare("INSERT INTO bookings VALUES(?,?,?,?,?)").run(
-        b.id,
-        req.user.id,
-        q.id,
-        key,
-        JSON.stringify(b),
+
+    const previous = db
+      .prepare(
+        "SELECT id,quote_id FROM bookings WHERE user_id=? AND request_key=?",
+      )
+      .get(req.user.id, key);
+    if (previous) {
+      if (previous.quote_id !== req.body.quoteId)
+        fail(409, "This request key already belongs to another quote.");
+      return { booking: present(read(previous.id)), reused: true };
+    }
+    const row = db
+      .prepare("SELECT * FROM quotes WHERE id=? AND user_id=?")
+      .get(String(req.body.quoteId), req.user.id);
+    if (!row) fail(404, "Quote not found.");
+    const existing = db
+      .prepare("SELECT id FROM bookings WHERE quote_id=?")
+      .get(row.id);
+    if (existing) return { booking: present(read(existing.id)), reused: true };
+    if (row.expires < Date.now())
+      fail(409, "Your quote expired. Request a fresh quote.");
+    if (req.body.accepted !== true)
+      fail(400, "Confirm the quote and return policy before booking.");
+    if (req.body.paymentOutcome === "decline")
+      fail(
+        402,
+        "Simulated authorization declined. No booking was created. Retry with approval.",
       );
-      db.prepare("INSERT INTO tracking VALUES(?,?,?)").run(
-        hash(b.trackingToken),
-        b.id,
-        Date.now() + 30 * 86400000,
-      );
-      ensurePin(b);
-      payment(b, "authorization", q.price.total);
-      event(b, req.user.id, "booking_created", {
-        unattended: b.delivery.unattended,
-      });
-      notify(
-        b,
-        `CoreRunner ${b.id} confirmed`,
-        `Demo delivery saved. ${b.status === "awaiting_store_readiness" ? "Store readiness review is required before dispatch." : "Awaiting dispatch assignment."} Tracking: /?track=${b.trackingToken}`,
-      );
-      return { booking: present(b), reused: false };
+    const q = JSON.parse(row.payload);
+    delivery(q.delivery);
+    const schedule = scheduling.plan(q.delivery);
+    const b = {
+      id: "CR-" + randomBytes(5).toString("hex").toUpperCase(),
+      userId: req.user.id,
+      quoteId: q.id,
+      delivery: q.delivery,
+      schedule,
+      price: q.price,
+      status:
+        q.delivery.item === "Groceries"
+          ? "awaiting_store_readiness"
+          : "confirmed",
+      paymentStatus: "authorized",
+      courier: null,
+      created: stamp(),
+      trackingToken: secret(),
+    };
+    db.prepare("INSERT INTO bookings VALUES(?,?,?,?,?)").run(
+      b.id,
+      req.user.id,
+      q.id,
+      key,
+      JSON.stringify(b),
+    );
+    db.prepare("INSERT INTO tracking VALUES(?,?,?)").run(
+      hash(b.trackingToken),
+      b.id,
+      Date.now() + 30 * 86400000,
+    );
+    ensurePin(b);
+    payment(b, "authorization", q.price.total);
+    event(b, req.user.id, "booking_created", {
+      unattended: b.delivery.unattended,
     });
+    notify(
+      b,
+      `CoreRunner ${b.id} confirmed`,
+      `Demo delivery saved. ${b.status === "awaiting_store_readiness" ? "Store readiness review is required before dispatch." : "Awaiting dispatch assignment."} Tracking: /?track=${b.trackingToken}`,
+    );
+    return { booking: present(b), reused: false };
+  };
+  app.post("/api/bookings", auth, (req, res) => {
+    const result = transaction(db, () => createBooking(req));
     res.status(result.reused ? 200 : 201).json(result);
+  });
+  installWalkthrough(app, {
+    db,
+    auth,
+    demoOnly,
+    createQuote,
+    createBooking,
+    read,
+    present,
+    cookies,
+    cookie,
+    hash,
+    secret,
   });
   app.get("/api/bookings", auth, (req, res) =>
     res.json({

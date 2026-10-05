@@ -1,3 +1,4 @@
+import DemoStudio, { DemoGuide } from "./DemoStudio";
 import { WindowAvailability } from "./ScheduleBoard";
 import CoreyChat from "./CoreyChat.jsx";
 import React, { useEffect, useRef, useState } from "react";
@@ -222,7 +223,9 @@ function App() {
   const [page, setPage] = useState(
       new URLSearchParams(window.location.search).has("track")
         ? "tracking"
-        : "home",
+        : new URLSearchParams(window.location.search).has("demo")
+          ? "demo"
+          : "home",
     ),
     [step, setStep] = useState(0),
     [data, setData] = useState(empty),
@@ -239,6 +242,30 @@ function App() {
     [busy, setBusy] = useState(false),
     [accepted, setAccepted] = useState(false),
     [paymentOutcome, setPaymentOutcome] = useState("approve");
+  const [activeDemo, setActiveDemo] = useState(null);
+  const navigateDemo = (destination) => {
+    setPage(destination);
+    setChat(false);
+    setMenu(false);
+    window.scrollTo(0, 0);
+  };
+  const acceptDemoUser = (u) => {
+    setUser(u);
+    setVerified(true);
+    setData((d) => ({
+      ...d,
+      name: u.name,
+      email: u.email,
+      phone: u.phone,
+      pickup: u.pickup,
+    }));
+  };
+  const previousPage = useRef(page);
+  useEffect(() => {
+    if (previousPage.current !== page)
+      document.getElementById("main")?.focus({ preventScroll: true });
+    previousPage.current = page;
+  }, [page]);
   const bookingKey = useRef(crypto.randomUUID());
   const lastFocus = useRef(null),
     inboxRef = useRef(null);
@@ -364,6 +391,7 @@ function App() {
     try {
       await api("/logout", { method: "POST", body: {} });
       setUser(null);
+      setActiveDemo(null);
       setVerified(false);
       setData(empty);
       setQuote(null);
@@ -449,6 +477,9 @@ function App() {
   );
   return (
     <>
+      <a className="skip-link" href="#main">
+        Skip to main content
+      </a>
       <div className="preview-strip">
         PORTFOLIO PREVIEW <span>Meet your next everyday delivery.</span>
         <span className="preview-right">
@@ -522,8 +553,26 @@ function App() {
           </div>
         </div>
       </header>
-      <main id="main">
-        {page === "courier" ? (
+      <main id="main" tabIndex={-1}>
+        {activeDemo && user && page !== "tracking" && (
+          <DemoGuide
+            run={activeDemo}
+            onNavigate={navigateDemo}
+            onExit={() => setActiveDemo(null)}
+          />
+        )}
+        {page === "demo" ? (
+          <DemoStudio
+            user={user}
+            onUser={acceptDemoUser}
+            onRun={(r) => {
+              setActiveDemo(r);
+              window.scrollTo(0, 0);
+            }}
+            onNavigate={navigateDemo}
+            onReset={() => setActiveDemo(null)}
+          />
+        ) : page === "courier" ? (
           <CourierWorkspace onBack={goHome} />
         ) : page === "tracking" ? (
           <RecipientTracking
@@ -590,6 +639,15 @@ function App() {
               </div>
               <CityScene />
             </section>
+            <div className="container demo-entry">
+              <span>Take the portfolio for a spin.</span>
+              <button
+                className="text-button"
+                onClick={() => navigateDemo("demo")}
+              >
+                Explore the guided demo <ArrowRight size={16} />
+              </button>
+            </div>
             <div className="promise-bar">
               <div className="container promises">
                 <span>
@@ -1352,6 +1410,9 @@ function App() {
         <Logo small />
         <span>From your door to theirs.</span>
         <div className="footer-tools">
+          <button className="text-button" onClick={() => navigateDemo("demo")}>
+            Guided demo
+          </button>
           <button
             className="text-button"
             onClick={() => {
@@ -1387,7 +1448,7 @@ function App() {
         </div>
         <small>CoreRunner Courier · Fictional portfolio project</small>
       </footer>
-      {!chat && page !== "courier" && (
+      {!chat && !["courier", "demo"].includes(page) && (
         <button className="floating-corey" onClick={openChat}>
           <Sparkles size={19} /> Ask Corey <span />
         </button>

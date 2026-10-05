@@ -10,3 +10,4 @@ data/
 coverage/
 *.pem
 *.key
+artifacts/

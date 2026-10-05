@@ -6,6 +6,10 @@ The product centers on personal and small-business deliveries. A polished React.
 
 Decisions described as agreed are requirements. Sections labeled proposed or open are planning recommendations, not additional approved policies. This conversation is the source of the agreed requirements; no market pricing or commercial viability is claimed.
 
+## Reusable operator handoff goal
+
+The user’s intended outcome is a plug-and-play-style app that can be offered to a future courier operator. Build toward a single-company installation with replaceable branding, business settings and service adapters, not a multi-tenant marketplace. Preserve the zero-key mock mode for portfolio use. The current deliverable is a local demo; production identity, hosted storage, deployment packaging and centralized operator configuration must be completed before claiming commercial plug-and-play readiness. The guided walkthrough and its limited reset are demo-only features, separate from ordinary business records.
+
 ## Portfolio organization
 
 Each portfolio project gets its own directory under the existing `Portfolio Building` workspace. This project lives in `corerunner-courier/`. Keep its source, documentation, assets, and project configuration inside that directory rather than mixing them with future projects.

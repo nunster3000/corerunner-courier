@@ -2,6 +2,22 @@
 
 A local full-stack portfolio application for a fictional Atlanta courier service. React provides customer, dispatch, and courier experiences; an Express API and SQLite own accounts, quotes, bookings, assignments, handoff proof, status events, and simulated payment records. Open this folder in VS Code. Agreed product requirements remain in [PROJECT_BLUEPRINT.md](PROJECT_BLUEPRINT.md).
 
+## Operator handoff direction
+
+The intended deliverable is a reusable application for **one courier company at a time**, with a polished mock mode for demonstrations and optional real service integrations supplied by a future owner. Today this is a runnable local portfolio demo, not a production-ready plug-and-play courier business. A buyer can run the demo without AI, maps, email or payment credentials. The local database initializes automatically on startup.
+
+Before a commercial launch, complete centralized branding/business configuration (some CoreRunner names, zones and rules are currently in code), production customer/staff/courier identity, hosted database and private image storage, deployment settings, and the buyer’s chosen email, payment and routing/tracking adapters. Finish operational exception/refund workflows and validate the operator’s policies. Multi-company tenancy is outside this single-operator architecture. Keep demo-role entry, generated scenarios and demo reset disabled in a production build; the current server deliberately refuses production startup.
+
+From a clean, committed Git checkout, `npm run package:handoff` exports `artifacts/CoreRunner-source.zip`. It includes committed source, tests, setup instructions and `.env.example`, with a `corerunner-courier/` root folder. It excludes ignored local credentials, databases, proof uploads, installed dependencies, build output and Git history. A guard rejects tracked local-data/credential-file paths; this is not a substitute for reviewing source before release. Unzip, install Node.js 22.13 or newer, run `npm ci`, then `npm run dev` to try the demo. A source archive is not a hosted deployment or an operating-service license.
+
+## Guided portfolio walkthrough
+
+Open **Explore the guided demo** on the homepage, **Guided demo** in the footer, or `/?demo=1`. Choose an everyday delivery, grocery review, or failed-handoff return scenario. Starting a scenario uses your signed-in demo account or creates a sample account through the existing simulated verification flow. It creates a sample quote and booking through the same backend rules; it does not auto-assign a courier, bypass proof, or make real payments.
+
+A guide above the workspace suggests the next role and action using the current backend status. Tracking opens separately. Scenario creation is retry-safe, and existing scenarios can be resumed from the overview. Current Atlanta shift hours and roster availability still apply; outside operating hours, samples can be created and inspected but assignment may wait for an eligible shift. Corey remains scripted.
+
+Reset requires an explicit checkbox and removes only backend-tagged scenario bookings for the **current account and browser cookie**. It removes their linked quotes, payments, events, notifications, proof images, grocery evidence and tracking links, releasing any associated courier reservation. It preserves ordinary bookings (including ordinary bookings on the same account), other browsers’ scenarios, accounts, shifts and other local work. Scenario deletion is for walkthrough data only; it is never the business cancellation flow. All scenario/reset endpoints require local demo mode. The public-hosting visitor isolation work is still separate.
+
 ## Run in VS Code
 
 Use Node.js 22.13 or newer. From the project terminal:

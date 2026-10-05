@@ -22,8 +22,16 @@ export function openDatabase(path) {
  CREATE TABLE IF NOT EXISTS proofs(id TEXT PRIMARY KEY,booking_id TEXT NOT NULL REFERENCES bookings(id),leg TEXT NOT NULL,method TEXT NOT NULL,actor TEXT NOT NULL,created TEXT NOT NULL,payload TEXT NOT NULL,image BLOB,request_key TEXT NOT NULL,UNIQUE(booking_id,leg),UNIQUE(booking_id,request_key));
  CREATE TABLE IF NOT EXISTS grocery_evidence(id TEXT PRIMARY KEY,booking_id TEXT NOT NULL REFERENCES bookings(id),request_key TEXT NOT NULL,payload TEXT NOT NULL,image BLOB NOT NULL,UNIQUE(booking_id,request_key));
  CREATE TABLE IF NOT EXISTS cancellation_quotes(id TEXT PRIMARY KEY,booking_id TEXT NOT NULL REFERENCES bookings(id),user_id TEXT NOT NULL REFERENCES users(id),fingerprint TEXT NOT NULL,payload TEXT NOT NULL,expires INTEGER NOT NULL);
+ CREATE TABLE IF NOT EXISTS demo_records(booking_id TEXT PRIMARY KEY REFERENCES bookings(id),user_id TEXT NOT NULL REFERENCES users(id),browser_key TEXT NOT NULL,scenario TEXT NOT NULL,UNIQUE(user_id,browser_key,scenario));
  CREATE TABLE IF NOT EXISTS tracking(token TEXT PRIMARY KEY,booking_id TEXT UNIQUE NOT NULL REFERENCES bookings(id),expires INTEGER NOT NULL);
  `);
+  if (
+    !db
+      .prepare("PRAGMA table_info(notifications)")
+      .all()
+      .some((c) => c.name === "booking_id")
+  )
+    db.exec("ALTER TABLE notifications ADD COLUMN booking_id TEXT");
   const seed = db.prepare("INSERT OR IGNORE INTO couriers VALUES(?,?,?)");
   for (const c of [
     ["cr-01", "Jordan Ellis", "SUV"],

@@ -11,7 +11,8 @@
     "format": "prettier --write src server scripts tests *.js *.json index.html .vscode",
     "api": "node --watch server/index.js",
     "test:server": "node --test server/*.test.js",
-    "pretest": "npm run build"
+    "pretest": "npm run build",
+    "package:handoff": "node scripts/package-handoff.mjs"
   },
   "dependencies": {
     "express": "^5.2.1",

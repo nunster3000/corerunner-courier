@@ -1430,3 +1430,107 @@ test("schedule enforces route fit, date boundaries and protects planned slots fr
     200,
   );
 });
+
+test("walkthrough seeds normal validated bookings once and reset preserves manual and other-browser records", async (t) => {
+  const { client, db } = await fixture(t);
+  const a = client(),
+    sameAccountOtherBrowser = client(),
+    other = client();
+  await login(a);
+  await login(sameAccountOtherBrowser);
+  await login(other, "other@example.com");
+  const manual = await book(a);
+  assert.equal((await a("/demo/scenarios/everyday", {})).status, 400);
+  const [, first] = await Promise.all([
+    a("/demo/walkthrough"),
+    a("/demo/scenarios/everyday", { accepted: true }),
+  ]);
+  assert.equal(first.status, 201);
+  const id = first.body.booking.id;
+  assert.equal(
+    (await a("/demo/scenarios/everyday", { accepted: true })).body.booking.id,
+    id,
+  );
+  assert.equal(first.body.booking.delivery.unattended, false);
+  assert.equal(first.body.booking.payments[0].kind, "authorization");
+  const otherBrowser = await sameAccountOtherBrowser(
+    "/demo/scenarios/everyday",
+    { accepted: true },
+  );
+  assert.notEqual(otherBrowser.body.booking.id, id);
+  await other("/demo/scenarios/groceries", { accepted: true });
+  assert.equal((await a("/demo/walkthrough")).body.runs.length, 1);
+  assert.equal((await a("/demo/walkthrough/reset", {})).status, 400);
+  await a("/demo/dispatch-session", {});
+  await a(`/dispatch/${id}/assign`, { courierId: "cr-01" });
+  assert.equal(
+    (
+      await a("/demo/walkthrough/reset", {
+        confirmed: true,
+        bookingId: manual.id,
+      })
+    ).body.removed,
+    1,
+  );
+  assert.ok(db.prepare("SELECT id FROM bookings WHERE id=?").get(manual.id));
+  assert.ok(
+    db
+      .prepare("SELECT id FROM bookings WHERE id=?")
+      .get(otherBrowser.body.booking.id),
+  );
+  assert.equal(
+    db
+      .prepare("SELECT count(*) n FROM notifications WHERE booking_id=?")
+      .get(id).n,
+    0,
+  );
+  assert.equal(
+    db.prepare("SELECT count(*) n FROM payments WHERE booking_id=?").get(id).n,
+    0,
+  );
+  assert.equal(
+    (await a("/track/" + first.body.booking.trackingToken)).status,
+    404,
+  );
+  assert.equal(
+    (await a(`/dispatch/${manual.id}/assign`, { courierId: "cr-01" })).status,
+    200,
+  );
+  assert.equal(
+    (await a("/demo/walkthrough/reset", { confirmed: true })).body.removed,
+    0,
+  );
+  assert.equal(
+    (await a("/demo/scenarios/everyday", { accepted: true })).status,
+    201,
+  );
+});
+test("walkthrough reset removes only linked image evidence and demo endpoints respect the demo gate", async (t) => {
+  const { client, db } = await fixture(t);
+  const c = client();
+  await login(c);
+  const demo = await c("/demo/scenarios/groceries", { accepted: true });
+  const b = demo.body.booking;
+  assert.equal(b.status, "awaiting_store_readiness");
+  await groceryUpload(c, b.id);
+  assert.equal(
+    db.prepare("SELECT count(*) n FROM grocery_evidence").get().n,
+    1,
+  );
+  await c("/demo/walkthrough/reset", { confirmed: true });
+  assert.equal(
+    db.prepare("SELECT count(*) n FROM grocery_evidence").get().n,
+    0,
+  );
+  const disabled = await fixture(t, { demo: false });
+  const off = disabled.client();
+  assert.equal((await off("/demo/scenarios")).status, 404);
+  assert.equal(
+    (await off("/demo/scenarios/everyday", { accepted: true })).status,
+    404,
+  );
+  assert.equal(
+    (await off("/demo/walkthrough/reset", { confirmed: true })).status,
+    404,
+  );
+});
