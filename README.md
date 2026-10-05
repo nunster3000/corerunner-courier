@@ -4,7 +4,7 @@ A local full-stack portfolio application for a fictional Atlanta courier service
 
 ## Vercel portfolio deployment
 
-A protected hosted-demo entrypoint and visitor-isolated storage adapter are now prepared. The frontend and API run in one Vercel project, with Neon connected through Vercel Marketplace. Each reviewer uses a password-gated temporary workspace. See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration, limits, the demo snapshot architecture and required live verification. No cloud deployment or live database connection has been verified yet. The local workflow below is unchanged.
+A public hosted-demo entrypoint and visitor-isolated storage adapter are now prepared. The frontend and API run in one Vercel project, with Neon connected through Vercel Marketplace. Visitors enter without a password and receive separate temporary workspaces. See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration, limits, the demo snapshot architecture and required live verification. Vercel deployment and hosted schema initialization have been verified. The local workflow below is unchanged.
 
 ## Operator handoff direction
 
@@ -95,7 +95,7 @@ There is no generic completion bypass in dispatch. Delivered and returned status
 | Grocery screenshot uploads, staff approval/rejection, resubmission and current-date assignment checks | Human review only; no OCR or store integration |
 | Customer-scoped notification history | Demo inbox includes sender and recipient copies; nothing is sent |
 
-The local entrypoint binds to loopback and refuses a production start. Demo authentication can impersonate any sample email, so **use sample data and do not expose this server publicly**. This is intentional for a local portfolio walkthrough; it is not an authentication system suitable for a deployed service. Real business deployment requires a real email provider, stronger staff identity, token delivery, operational authorization, abuse controls, and production hosting. The separate protected portfolio entrypoint isolates simulated roles inside temporary visitor workspaces.
+The local entrypoint binds to loopback and refuses a production start. Demo authentication can impersonate any sample email, so **use sample data and do not expose this server publicly**. This is intentional for a local portfolio walkthrough; it is not an authentication system suitable for a deployed service. Real business deployment requires a real email provider, stronger staff identity, token delivery, operational authorization, abuse controls, and production hosting. The separate public portfolio entrypoint isolates simulated roles inside temporary visitor workspaces.
 
 ## Corey: scripted portfolio demo
 

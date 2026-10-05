@@ -1,4 +1,3 @@
-import HostedAccess from "./HostedAccess";
 import { operator, loadOperator } from "./operator";
 import DemoStudio, { DemoGuide } from "./DemoStudio";
 import { WindowAvailability } from "./ScheduleBoard";
@@ -495,7 +494,7 @@ function App() {
         PORTFOLIO PREVIEW <span>Meet your next everyday delivery.</span>
         <span className="preview-right">
           {operator.hostedDemo
-            ? "Private demo · expires in 2 hours"
+            ? "Public demo · workspace lasts 2 hours"
             : "Local demo · no real deliveries or payments"}
         </span>
       </div>
@@ -1535,11 +1534,7 @@ root.render(
 );
 loadOperator()
   .then(() => root.render(<App />))
-  .catch((error) => {
-    if (error.status === 401) {
-      root.render(<HostedAccess />);
-      return;
-    }
+  .catch(() => {
     root.render(
       <main className="container">
         <h1>Service unavailable</h1>

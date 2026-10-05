@@ -5,8 +5,6 @@ export function configurationIssues(env) {
   const issues = [];
   if (env.APP_MODE !== "portfolio") issues.push("APP_MODE");
   if (!env.DATABASE_URL) issues.push("DATABASE_URL");
-  if (!env.DEMO_ACCESS_PASSWORD || env.DEMO_ACCESS_PASSWORD.length < 16)
-    issues.push("DEMO_ACCESS_PASSWORD");
   if (!env.DEMO_SESSION_SECRET || env.DEMO_SESSION_SECRET.length < 32)
     issues.push("DEMO_SESSION_SECRET");
   try {
@@ -43,7 +41,6 @@ export function createHostedHandler({
           const store = makeStore(env.DATABASE_URL);
           const app = makeApp({
             store,
-            password: env.DEMO_ACCESS_PASSWORD,
             secret: env.DEMO_SESSION_SECRET,
             origin: env.APP_ORIGIN,
           });

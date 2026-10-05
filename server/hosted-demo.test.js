@@ -4,7 +4,6 @@ import { createHostedDemo } from "./hosted-demo.js";
 import { createApp } from "./app.js";
 import { captureDemo, restoreDemo } from "./demo-snapshot.js";
 
-const password = "sample-reviewer-password";
 const secret = "sample-signing-secret-for-isolated-tests";
 function memoryStore() {
   const rows = new Map(),
@@ -49,7 +48,6 @@ async function fixture(t, options = {}) {
   const store = options.store || memoryStore();
   const app = createHostedDemo({
     store,
-    password,
     secret,
     origin: "http://127.0.0.1",
     secure: false,
@@ -90,8 +88,7 @@ async function fixture(t, options = {}) {
   };
   return { store, browser };
 }
-async function unlock(b) {
-  assert.equal((await b.call("/demo-access", { password })).status, 200);
+async function openDemo(b) {
   assert.equal((await b.call("/operator")).status, 200);
 }
 async function signup(b) {
@@ -112,27 +109,17 @@ async function signup(b) {
   return result.body.user;
 }
 
-test("hosted demo gates access and persists independent browser workspaces across fresh app instances", async (t) => {
+test("public demo persists independent browser workspaces across fresh app instances", async (t) => {
   const { store, browser } = await fixture(t);
   const a = browser(),
     b = browser();
-  assert.equal((await a.call("/operator")).status, 401);
   assert.equal(
-    (await a.call("/demo-access", { password: "wrong" })).status,
-    401,
-  );
-  assert.equal(
-    (
-      await a.call(
-        "/demo-access",
-        { password },
-        { origin: "https://evil.example" },
-      )
-    ).status,
+    (await a.call("/operator", undefined, { origin: "https://evil.example" }))
+      .status,
     403,
   );
-  await unlock(a);
-  await unlock(b);
+  await openDemo(a);
+  await openDemo(b);
   const userA = await signup(a),
     userB = await signup(b);
   assert.notEqual(userA.id, userB.id);
@@ -161,7 +148,7 @@ test("hosted demo gates access and persists independent browser workspaces acros
 test("failed persistence and revision conflicts never confirm success or overwrite saved state", async (t) => {
   const { store, browser } = await fixture(t);
   const b = browser();
-  await unlock(b);
+  await openDemo(b);
   await signup(b);
   store.failSave = true;
   let result = await b.call("/demo/scenarios/everyday", { accepted: true });
@@ -184,26 +171,17 @@ test("failed persistence and revision conflicts never confirm success or overwri
   assert.equal((await b.call("/bookings")).body.bookings.length, 1);
 });
 
-test("access expires, forged cookies fail and access attempts are limited", async (t) => {
-  let time = Date.now();
-  const { browser } = await fixture(t, { now: () => time });
-  const b = browser();
-  await unlock(b);
-  const access = b.jar.get("cr_demo_access");
-  b.jar.set(
-    "cr_demo_access",
-    access.replace(/.$/, access.endsWith("a") ? "b" : "a"),
-  );
-  assert.equal((await b.call("/operator")).status, 401);
-  b.jar.set("cr_demo_access", access);
-  time += 2 * 60 * 60 * 1000 + 1;
-  assert.equal((await b.call("/operator")).status, 401);
-  for (let i = 0; i < 10; i++)
-    assert.equal(
-      (await b.call("/demo-access", { password: "wrong" })).status,
-      401,
-    );
-  assert.equal((await b.call("/demo-access", { password })).status, 429);
+test("unknown workspace cookies cannot access data and new workspaces remain rate limited", async (t) => {
+  const { browser } = await fixture(t);
+  const a = browser();
+  await openDemo(a);
+  await signup(a);
+  a.jar.set("cr_demo_workspace", "a".repeat(64));
+  assert.equal((await a.call("/bookings")).status, 410);
+  await openDemo(a);
+  assert.equal((await a.call("/me")).status, 401);
+  for (let i = 0; i < 8; i++) await openDemo(browser());
+  assert.equal((await browser().call("/operator")).status, 429);
 });
 
 test("snapshot preserves binary evidence and rejects unsupported formats", () => {
@@ -253,11 +231,9 @@ test("secure cookies, missing workspace recovery and workspace capacity are enfo
     origin: "https://demo.example",
   });
   const b = browser();
-  const access = await b.call("/demo-access", { password });
-  assert.match(access.headers.get("set-cookie"), /HttpOnly/);
-  assert.match(access.headers.get("set-cookie"), /Secure/);
-  assert.match(access.headers.get("set-cookie"), /SameSite=Strict/);
   const boot = await b.call("/operator");
+  assert.match(boot.headers.get("set-cookie"), /HttpOnly/);
+  assert.match(boot.headers.get("set-cookie"), /SameSite=Strict/);
   assert.equal(boot.body.hostedDemo, true);
   assert.match(boot.headers.get("set-cookie"), /Secure/);
   await signup(b);
@@ -270,7 +246,6 @@ test("secure cookies, missing workspace recovery and workspace capacity are enfo
   assert.equal((await b.call("/me")).status, 401);
   const tiny = await fixture(t, { snapshotLimit: 100 });
   const full = tiny.browser();
-  await full.call("/demo-access", { password });
   const result = await full.call("/operator");
   assert.equal(result.status, 413);
   assert.equal(result.headers.get("set-cookie"), null);

@@ -254,3 +254,7 @@ Also define email-link expiration, evidence retention, location freshness, suppo
 ### Vercel-only portfolio hosting decision
 
 The user chose everything on Vercel rather than a separate Node hosting provider. A Node API function, Vite frontend routing, Neon Marketplace store and protected visitor-specific demo workspaces are prepared. The low-traffic demo adapter persists bounded SQLite table snapshots and scripted chat state in Postgres, with revision checks before confirming responses. It is not a normalized production database migration. No real AI or commercial integrations are activated. Live Neon and Vercel verification is pending account configuration; DEPLOYMENT.md records setup and limitations.
+
+### Public portfolio access
+
+The user explicitly chose a public demo without a visitor password. The site-wide gate and DEMO_ACCESS_PASSWORD dependency are removed. Anonymous visitors get isolated, expiring browser workspaces; simulated registration remains part of booking. The private server secret, rate limits, upload limits and cross-origin restrictions remain.

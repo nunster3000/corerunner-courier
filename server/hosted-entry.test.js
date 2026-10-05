@@ -5,7 +5,6 @@ import { configurationIssues, createHostedHandler } from "./hosted-entry.js";
 const env = {
   APP_MODE: "portfolio",
   DATABASE_URL: "private-database-credential",
-  DEMO_ACCESS_PASSWORD: "private-password-for-demo",
   DEMO_SESSION_SECRET: "private-signing-secret-with-enough-characters",
   APP_ORIGIN: "https://demo.example",
 };
@@ -25,7 +24,6 @@ test("hosted startup identifies missing settings without leaking credentials or 
   assert.deepEqual(configurationIssues({}), [
     "APP_MODE",
     "DATABASE_URL",
-    "DEMO_ACCESS_PASSWORD",
     "DEMO_SESSION_SECRET",
     "APP_ORIGIN",
   ]);

@@ -1,17 +1,10 @@
 import express from "express";
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createApp } from "./app.js";
 import { captureDemo, restoreDemo } from "./demo-snapshot.js";
 
 const ttl = 2 * 60 * 60 * 1000;
 const hash = (value) => createHash("sha256").update(value).digest("hex");
-const equal = (a, b) =>
-  timingSafeEqual(Buffer.from(hash(a)), Buffer.from(hash(b)));
 const cookies = (req) =>
   Object.fromEntries(
     (req.headers.cookie || "")
@@ -25,22 +18,15 @@ const cookies = (req) =>
 
 export function createHostedDemo({
   store,
-  password,
   origin,
   secret,
   secure = true,
   now = Date.now,
   snapshotLimit = 2 * 1024 * 1024,
 }) {
-  if (
-    !store ||
-    typeof password !== "string" ||
-    password.length < 16 ||
-    typeof secret !== "string" ||
-    secret.length < 32
-  )
+  if (!store || typeof secret !== "string" || secret.length < 32)
     throw new Error(
-      "Hosted demo requires a store, a 16-character access password and a 32-character signing secret.",
+      "Hosted demo requires a store and a 32-character server secret.",
     );
   const site = new URL(origin);
   if (site.origin !== origin || (secure && site.protocol !== "https:"))
@@ -55,17 +41,6 @@ export function createHostedDemo({
     sameSite: "strict",
     secure,
     maxAge: ttl,
-  };
-  const sign = (value) =>
-    createHmac("sha256", secret).update(value).digest("hex");
-  const authorized = (req) => {
-    const [expires, signature] = (cookies(req).cr_demo_access || "").split(".");
-    return (
-      /^\d+$/.test(expires || "") &&
-      Number(expires) > now() &&
-      Number(expires) <= now() + ttl &&
-      equal(signature || "", sign(expires))
-    );
   };
   app.use((req, res, next) => {
     res.set("Cache-Control", "no-store");
@@ -85,50 +60,9 @@ export function createHostedDemo({
     next();
   });
   app.get("/api/health", (req, res) =>
-    res.json({ ok: true, mode: "protected-portfolio-demo" }),
+    res.json({ ok: true, mode: "public-portfolio-demo" }),
   );
-  app.post(
-    "/api/demo-access",
-    express.json({ limit: "2kb" }),
-    async (req, res) => {
-      // Vercel supplies x-vercel-forwarded-for. Local callers use their socket IP.
-      const ip =
-        req.headers["x-vercel-forwarded-for"] ||
-        req.socket.remoteAddress ||
-        "unknown";
-      if (
-        !(await store.allow(
-          `access:${hash(secret + ip)}`,
-          10,
-          15 * 60000,
-          now(),
-        ))
-      )
-        return res.status(429).json({
-          error: "Too many access attempts. Try again in 15 minutes.",
-        });
-      if (
-        typeof req.body?.password !== "string" ||
-        !equal(req.body.password, password)
-      )
-        return res
-          .status(401)
-          .json({ error: "That demo access password is incorrect." });
-      const expires = String(now() + ttl);
-      res.cookie(
-        "cr_demo_access",
-        `${expires}.${sign(expires)}`,
-        cookieOptions,
-      );
-      res.json({ ok: true });
-    },
-  );
-  app.use(async (req, res, next) => {
-    if (!authorized(req))
-      return res.status(401).json({
-        error: "Enter the portfolio demo access password to continue.",
-        code: "DEMO_ACCESS_REQUIRED",
-      });
+  app.use((req, res, next) => {
     if (!req.path.startsWith("/api/"))
       return res.status(404).json({ error: "Endpoint not found." });
     next();
